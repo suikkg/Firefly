@@ -34,9 +34,9 @@ import rehypeFigure from "./src/plugins/rehype-figure.mjs";
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://suikkg.github.io',
+	site: 'https://98121516.xyz',
 
-	base: "/Firefly/",
+	base: "/",
 	trailingSlash: "always",
 	integrations: [
 		tailwind({
