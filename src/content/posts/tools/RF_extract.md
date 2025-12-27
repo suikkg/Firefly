@@ -1,10 +1,10 @@
 ---
 title: 通过RF(1.7.4版本)输出结果log.html统计失败用例数量及基本原因
-slug: tools-ride
+//slug: tools-ride
 published: 2025-12-27
 pinned: false
 description: 自用工具，用例结束处理中的失败也会记录
-tags: [软件测试, RIDE，python]
+tags: [软件测试, RIDE, python]
 category: Tools
 licenseName: "Unlicensed"
 author: suikk
@@ -14,11 +14,10 @@ date: 2025-12-27
 image: ./cover.jpg
 pubDate: 2025-12-27
 ---
-
 复制并保存为extract_failures_v2_comment.py
 使用py extract_failures_v2_comment.py path/log.html，默认生成csv文件并添加时间戳，可选功能--json-output同时生成json文件。
 
-```
+```python
 #!/usr/bin/env python3
 """Extract failed Robot Framework test cases directly from log.html script data."""
 
