@@ -8,7 +8,7 @@ const SITE_LANG = "zh_CN";
 export const siteConfig: SiteConfig = {
 	title: "Firefly",
 	subtitle: "Demo site",
-	site_url: "https://firefly.cuteleaf.cn",
+	site_url: "https://www.98121516.xyz",
 	description:
 		"Firefly 是一款基于 Astro 框架和 Fuwari 模板开发的清新美观且现代化个人博客主题模板，专为技术爱好者和内容创作者设计。该主题融合了现代 Web 技术栈，提供了丰富的功能模块和高度可定制的界面，让您能够轻松打造出专业且美观的个人博客网站。",
 	keywords: [
@@ -52,7 +52,7 @@ export const siteConfig: SiteConfig = {
 	navbarWidthFull: false, // 全宽导航栏，导航栏是否占满屏幕宽度，true：占满，false：不占满
 
 	// 站点开始日期，用于统计运行天数
-	siteStartDate: "2025-01-01", // 请修改为你的站点实际开始日期，格式：YYYY-MM-DD
+	siteStartDate: "2025-12-26", // 请修改为你的站点实际开始日期，格式：YYYY-MM-DD
 
 	// bangumi配置
 	bangumi: {
