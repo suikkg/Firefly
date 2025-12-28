@@ -168,6 +168,7 @@ export type CommentConfig = {
 		lang?: string;
 		login?: "enable" | "force" | "disable";
 		visitorCount?: boolean; // 是否统计访问量，true 启用访问量，false 关闭
+		wordLimit?: number | string | [number | string, number | string];
 	};
 	artalk?: {
 		// 后端程序 API 地址

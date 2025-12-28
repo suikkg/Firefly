@@ -5,13 +5,15 @@ interface Props {
 	path: string;
 }
 
+const DEFAULT_WORD_LIMIT = 500;
+const wordLimit = commentConfig.waline?.wordLimit ?? DEFAULT_WORD_LIMIT;
+
 const config = {
 	...commentConfig.waline,
 	el: "#waline",
 	path: Astro.props.path,
 	dark: "html.dark",
-	//wordLimit: ["2", "300"],
-	wordLimit: 500,
+	wordLimit,
 	...(commentConfig.waline?.visitorCount ? { pageview: true } : {}),
 };
 ---
@@ -25,27 +27,147 @@ const config = {
   </script>
 </div>
 
-<script is:inline>
-  const MAX = 500;
+<script is:inline define:vars={{ wordLimit }}>
+  (() => {
+    /**
+     * Word limit can be a number or a [min, max] tuple.
+     * We only care about the upper bound for the counter.
+     */
+    const getUpperBound = (limit) => {
+      if (!limit && limit !== 0) return null;
+      if (Array.isArray(limit)) {
+        const candidate = Number(limit[1] ?? limit[0]);
+        return Number.isFinite(candidate) ? candidate : null;
+      }
+      const numericValue = Number(limit);
+      return Number.isFinite(numericValue) ? numericValue : null;
+    };
 
-  const observer = new MutationObserver(() => {
-    const counter = document.querySelector('.wl-word-limit');
-    const editor = document.querySelector('.wl-editor');
+    const walineRoot = document.querySelector('#waline');
+    if (!walineRoot) {
+      return;
+    }
 
-    if (!counter || !editor) return;
+    const CONTROL_SELECTOR = 'input, textarea, select';
+    const srOnlyStyles =
+      'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0;white-space:nowrap;';
 
-    const len = editor.value.length;
-	if (len > MAX) {
-  		counter.textContent = `${MAX}+`;
-  		counter.style.color = 'var(--warning)';
-	} else {
-		counter.textContent = `${len} / ${MAX}`;
-		counter.style.color = '';
-	}
-  });
+    const maxWords = getUpperBound(wordLimit);
+    let wordCounterBound = false;
+    let controlIdSeed = 0;
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-  });
+    const updateCounter = (counter, editor) => {
+      const currentLength =
+        editor instanceof HTMLTextAreaElement
+          ? editor.value.length
+          : editor.textContent?.length ?? 0;
+
+      if (maxWords && currentLength > maxWords) {
+        counter.textContent = `${maxWords}+`;
+        counter.style.color = 'var(--warning)';
+        return;
+      }
+
+      counter.textContent = `${currentLength} / ${maxWords}`;
+      counter.style.color = '';
+    };
+
+    const bindWordCounter = () => {
+      if (wordCounterBound || !maxWords || maxWords <= 0) {
+        return;
+      }
+
+      const counter = walineRoot.querySelector('.wl-word-limit');
+      const editor = walineRoot.querySelector('.wl-editor');
+
+      if (!counter || !editor) {
+        return;
+      }
+
+      const render = () => updateCounter(counter, editor);
+      render();
+      editor.addEventListener('input', render);
+      wordCounterBound = true;
+    };
+
+    const getControlForLabel = (label) => {
+      const controlId = label.getAttribute('for');
+      if (controlId) {
+        const controlById = document.getElementById(controlId);
+        if (controlById) {
+          return controlById;
+        }
+      }
+
+      const nestedControl = label.querySelector(CONTROL_SELECTOR);
+      if (nestedControl) {
+        return nestedControl;
+      }
+
+      const previousSibling = label.previousElementSibling;
+      if (previousSibling && previousSibling.matches?.(CONTROL_SELECTOR)) {
+        return previousSibling;
+      }
+
+      const nextSibling = label.nextElementSibling;
+      if (nextSibling && nextSibling.matches?.(CONTROL_SELECTOR)) {
+        return nextSibling;
+      }
+
+      return null;
+    };
+
+    const ensureAccessibleLabel = (label) => {
+      const control = getControlForLabel(label);
+      if (!control) {
+        return;
+      }
+
+      if (!control.id) {
+        controlIdSeed += 1;
+        control.id = `waline-field-${controlIdSeed}`;
+        control.setAttribute('data-waline-a11y-id', 'true');
+      }
+      label.htmlFor = control.id;
+
+      if ((label.textContent || '').trim().length > 0) {
+        return;
+      }
+
+      const isSyntheticId = control.getAttribute('data-waline-a11y-id') === 'true';
+      const fallbackText =
+        control.getAttribute('placeholder') ||
+        control.getAttribute('aria-label') ||
+        control.getAttribute('title') ||
+        control.getAttribute('name') ||
+        (isSyntheticId ? null : control.id) ||
+        'Form control';
+
+      const srOnlyText = document.createElement('span');
+      srOnlyText.textContent = fallbackText;
+      srOnlyText.style.cssText = srOnlyStyles;
+      label.appendChild(srOnlyText);
+    };
+
+    const enhanceLabels = () => {
+      const labels = walineRoot.querySelectorAll('label:not([data-waline-a11y="true"])');
+      labels.forEach((label) => {
+        ensureAccessibleLabel(label);
+        label.setAttribute('data-waline-a11y', 'true');
+      });
+    };
+
+    const walineObserver = new MutationObserver(() => {
+      bindWordCounter();
+      enhanceLabels();
+    });
+
+    walineObserver.observe(walineRoot, {
+      childList: true,
+      subtree: true,
+    });
+
+    bindWordCounter();
+    enhanceLabels();
+  })();
 </script>
