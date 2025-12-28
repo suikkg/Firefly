@@ -11,7 +11,7 @@ author: suikk
 sourceLink: "https://github.com/emn178/markdown"
 draft: false
 date: 2025-12-27
-image: ./cover.jpg
+image: api
 pubDate: 2025-12-27
 ---
 复制并保存为extract_failures_v2_comment.py
