@@ -10,7 +10,8 @@ const config = {
 	el: "#waline",
 	path: Astro.props.path,
 	dark: "html.dark",
-	wordLimit: ["2", "300"],
+	//wordLimit: ["2", "300"],
+	wordLimit: 500,
 	...(commentConfig.waline?.visitorCount ? { pageview: true } : {}),
 };
 ---
@@ -23,3 +24,28 @@ const config = {
     init(config);
   </script>
 </div>
+
+<script is:inline>
+  const MAX = 500;
+
+  const observer = new MutationObserver(() => {
+    const counter = document.querySelector('.wl-word-limit');
+    const editor = document.querySelector('.wl-editor');
+
+    if (!counter || !editor) return;
+
+    const len = editor.value.length;
+	if (len > MAX) {
+  		counter.textContent = `${MAX}+`;
+  		counter.style.color = 'var(--warning)';
+	} else {
+		counter.textContent = `${len} / ${MAX}`;
+		counter.style.color = '';
+	}
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+</script>
