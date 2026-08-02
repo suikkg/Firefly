@@ -59,7 +59,11 @@ export const siteConfig: SiteConfig = {
 			// 可选，指定主题 'light' | 'dark'
 			// theme: "light",
 			// 可选，图标大小
-			// sizes: "32x32",
+			sizes: "32x32",
+		},
+		{
+			src: "/favicon/firefly-192.png",
+			sizes: "192x192",
 		},
 	],
 
