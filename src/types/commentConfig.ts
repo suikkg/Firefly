@@ -26,6 +26,11 @@ export type CommentConfig = {
 		emoji: string[];
 		login?: "enable" | "force" | "disable";
 		visitorCount?: boolean; // 是否统计访问量，true 启用访问量，false 关闭
+		/**
+		 * 评论字数限制。支持数字或 [min, max] 数组
+		 * 例如：500 或 ["2", "300"]
+		 */
+		wordLimit?: number | string | [number | string, number | string];
 	};
 	artalk?: {
 		// 后端程序 API 地址
