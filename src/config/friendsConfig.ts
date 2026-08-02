@@ -42,6 +42,16 @@ export const friendsConfig: FriendLink[] = [
 		enabled: true,
 	},
 	{
+		title: "元启 Y-Nav",
+		imgurl:
+			"https://weavatar.com/avatar/c1f6002c32c651c9263ebd928f08718a?s=640",
+		desc: "元启 Y-Nav 导航站",
+		siteurl: "https://www.kkinto.com",
+		tags: ["Nav"],
+		weight: 8,
+		enabled: true,
+	},
+	{
 		title: "Astro",
 		imgurl: "https://avatars.githubusercontent.com/u/44914786?v=4&s=640",
 		desc: "The web framework for content-driven websites. ⭐️ Star to support our work!",
