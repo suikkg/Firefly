@@ -64,6 +64,13 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 
 			// 番组计划
 			LinkPresets.Bangumi,
+
+			// 音乐（YouTube 歌单）
+			{
+				name: "音乐",
+				url: "/music/",
+				icon: "material-symbols:music-note",
+			},
 		],
 	});
 
