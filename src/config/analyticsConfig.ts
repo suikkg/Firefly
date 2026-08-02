@@ -4,10 +4,11 @@ export const analyticsConfig: AnalyticsConfig = {
 	// Google Analytics ID
 	// 新版主题使用 gtag.js，需要 GA4 的 G- 开头 ID（旧 GTM- 格式不兼容）
 	// 获取：https://analytics.google.com 创建资源后获得，格式如 G-XXXXXXXXXX
-	googleAnalyticsId: "",
+	googleAnalyticsId: "G-2T47VXCDHK",
 	// Microsoft Clarity ID
 	// 获取：https://clarity.microsoft.com 创建项目后获得，格式如 tx9equrgr6
-	microsoftClarityId: "tx9equrgr6",
+	// 若不需要可留空禁用
+	microsoftClarityId: "xvwfugsoho",
 	// Umami 统计配置
 	umamiAnalytics: {
 		// Umami Website ID
