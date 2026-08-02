@@ -6,10 +6,10 @@ const SITE_LANG = "zh_CN";
 
 export const siteConfig: SiteConfig = {
 	// 站点标题
-	title: "Firefly",
+	title: "KK",
 
 	// 站点副标题
-	subtitle: "Demo site",
+	subtitle: "KK's Blog",
 
 	// 站点 URL
 	site_url: "https://www.98121516.xyz",
@@ -75,9 +75,9 @@ export const siteConfig: SiteConfig = {
 		// 例如: { type: "image", value: "assets/images/logo.png", valueDark: "assets/images/logo-dark.png", alt: "Logo" }
 		// 使用 Astro 图标库时不需要设置 valueDark，图标会自动跟随主题亮暗色切换
 		logo: {
-			type: "image",
-			value: "assets/images/logo/firefly-light.png",
-			valueDark: "assets/images/logo/firefly-dark.png",
+			type: "url",
+			value: "https://img.kkinto.com/assets/images/logo/firefly-light.png",
+			valueDark: "https://img.kkinto.com/assets/images/logo/firefly-dark.png",
 			alt: "🍀",
 		},
 		// 导航栏标题

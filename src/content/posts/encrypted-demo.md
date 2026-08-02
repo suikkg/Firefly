@@ -24,7 +24,7 @@ slug: encrypted-demo
 
 ## 图片
 
-![Firefly](./images/1.avif)
+![Firefly](https://img.kkinto.com/content/images/1.avif)
 
 ## GitHub 仓库卡片
 
