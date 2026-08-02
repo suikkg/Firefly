@@ -42,7 +42,10 @@ jobs:
 
       - name: Create .nojekyll file
         run: touch dist/.nojekyll
-      
+
+      - name: Add CNAME for custom domain
+        run: echo "www.98121516.xyz" > dist/CNAME
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
