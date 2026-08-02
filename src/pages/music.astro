@@ -6,12 +6,22 @@ import MainGridLayout from "@/layouts/MainGridLayout.astro";
 // YouTube 音乐歌单页面（方案A）
 // 访客可自行登录自己的 YouTube 账号（Premium 会员则无广告）
 //
+// 支持多个歌单，每个歌单一个嵌入播放器
 // 歌单 ID 获取方法：
 //   YouTube 打开歌单 -> 地址栏 URL 中 list= 后面的参数
 //   例如 https://www.youtube.com/playlist?list=PLxxxxxxxxxx
-//   则 YOUTUBE_PLAYLIST_ID = "PLxxxxxxxxxx"
+//   则填入 "PLxxxxxxxxxx"
 // ============================================================
-const YOUTUBE_PLAYLIST_ID = "";
+const YOUTUBE_PLAYLISTS = [
+	{
+		name: "粤语经典 歌单一",
+		id: "PLDX7UghaEhS3tozBn2fQvxv9emsBO3Fd8",
+	},
+	{
+		name: "粤语经典 歌单二",
+		id: "PLLlhPNUoErKZ9j6QEWn1NvGzuQsXX6LUt",
+	},
+];
 
 const title = "音乐";
 const description = "YouTube 歌单播放，登录你的 YouTube 账号可无广告完整播放";
@@ -40,22 +50,29 @@ const description = "YouTube 歌单播放，登录你的 YouTube 账号可无广
       </div>
 
       {
-        YOUTUBE_PLAYLIST_ID ? (
-          <div>
-            <p class="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
-              🎧 提示：登录你的 YouTube 账号（Premium 会员）后可无广告完整播放；
-              未登录时部分歌曲可能插播广告。
-            </p>
-            <div class="overflow-hidden rounded-xl bg-black/5 dark:bg-white/5">
-              <iframe
-                src={`https://www.youtube.com/embed/videoseries?list=${YOUTUBE_PLAYLIST_ID}`}
-                class="h-[480px] w-full border-0"
-                title="YouTube 歌单播放器"
-                loading="lazy"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowfullscreen
-              ></iframe>
-            </div>
+        YOUTUBE_PLAYLISTS.length > 0 ? (
+          <div class="space-y-8">
+            {YOUTUBE_PLAYLISTS.map((playlist) => (
+              <div>
+                <h3 class="mb-3 text-lg font-bold text-neutral-800 dark:text-neutral-100">
+                  🎵 {playlist.name}
+                </h3>
+                <p class="mb-3 text-sm text-neutral-500 dark:text-neutral-400">
+                  🎧 提示：登录你的 YouTube 账号（Premium 会员）后可无广告完整播放；
+                  未登录时部分歌曲可能插播广告。
+                </p>
+                <div class="overflow-hidden rounded-xl bg-black/5 dark:bg-white/5">
+                  <iframe
+                    src={`https://www.youtube.com/embed/videoseries?list=${playlist.id}`}
+                    class="h-[480px] w-full border-0"
+                    title={playlist.name}
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowfullscreen
+                  ></iframe>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div class="py-12 text-center">
