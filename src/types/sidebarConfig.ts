@@ -10,7 +10,8 @@ export type WidgetComponentType =
 	| "calendar"
 	| "music"
 	| "siteInfo"
-	| "dynamic";
+	| "dynamic"
+	| "weather";
 
 export type WidgetComponentConfig = {
 	type: WidgetComponentType; // 组件类型
@@ -41,6 +42,12 @@ export type WidgetSpecificConfig = {
 	ad?: AdConfig; // 广告组件专用配置
 	siteInfo?: SiteInfoConfig; // 站点信息组件专用配置
 	dynamic?: DynamicWidgetConfig; // 最新动态组件专用配置
+	weather?: WeatherWidgetConfig; // 天气组件专用配置
+};
+
+export type WeatherWidgetConfig = {
+	city?: string; // 查询城市，留空则用接口默认（IP 定位）
+	refreshMinutes?: number; // 缓存刷新间隔（分钟），默认 30，最少 5
 };
 
 export type DynamicWidgetConfig = {

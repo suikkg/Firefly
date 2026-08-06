@@ -1,0 +1,130 @@
+---
+import WidgetLayout from "@/components/common/WidgetLayout.astro";
+import type { WidgetComponentConfig } from "@/types/config";
+
+interface Props {
+	class?: string;
+	style?: string;
+	widgetConfig?: WidgetComponentConfig;
+}
+
+const { class: className, style, widgetConfig } = Astro.props;
+
+const showTitle = widgetConfig?.showTitle !== false;
+const city = widgetConfig?.specificConfig?.weather?.city ?? "";
+const refreshMinutes = widgetConfig?.specificConfig?.weather?.refreshMinutes ?? 30;
+
+// 和风天气 icon 码 → emoji（uapis.cn 接口返回 weather_icon）
+const iconMap: Record<string, string> = {
+	"100": "☀️", // 晴
+	"101": "🌤️", // 多云
+	"102": "🌤️", // 少云
+	"103": "⛅", // 晴间多云
+	"104": "☁️", // 阴
+	"300": "🌦️", "301": "🌦️", "302": "⛈️", "303": "⛈️", "304": "⛈️", // 阵雨/雷阵雨
+	"305": "🌧️", "306": "🌧️", "307": "🌧️", "308": "🌧️", "309": "🌦️", // 雨
+	"310": "🌧️", "311": "🌧️", "312": "🌧️", "313": "🌧️", "314": "🌧️",
+	"315": "🌧️", "316": "🌧️", "317": "🌧️", "318": "🌧️", "399": "🌧️",
+	"400": "🌨️", "401": "🌨️", "402": "❄️", "403": "❄️", "404": "🌨️", // 雪
+	"405": "🌨️", "406": "🌧️", "407": "🌨️", "408": "🌨️", "409": "❄️",
+	"410": "❄️", "411": "❄️", "412": "❄️", "413": "🌧️", "414": "🌨️",
+	"415": "🌨️", "416": "🌧️", "417": "🌧️", "418": "❄️", "499": "🌨️",
+	"500": "🌫️", "501": "🌫️", "502": "😷", "503": "🌪️", "504": "🌫️", // 雾霾沙尘
+	"507": "🌪️", "508": "🌪️", "509": "🌫️", "510": "🌫️", "511": "😷",
+	"512": "😷", "513": "😷", "514": "🌫️", "515": "🌫️",
+	"900": "🥵", // 热
+	"901": "🥶", // 冷
+	"999": "🌡️", // 未知
+};
+---
+
+<WidgetLayout name="天气" showTitle={showTitle} id="weather-widget" class={className} style={style}>
+	<div id="weather-widget-content" class="min-h-16">
+		<div class="text-sm text-neutral-400 dark:text-neutral-500 py-3">天气加载中…</div>
+	</div>
+</WidgetLayout>
+
+<script is:inline data-swup-ignore-script define:vars={{ city, refreshMinutes, iconMap }}>
+	(function () {
+		const container = document.getElementById("weather-widget-content");
+		if (!container) return;
+
+		const WEATHER_URL = "https://uapis.cn/api/v1/misc/weather";
+		const CACHE_KEY = "kk-weather-cache";
+		const TTL = Math.max(refreshMinutes, 5) * 60 * 1000; // 最少 5 分钟
+
+		function emoji(icon) {
+			return (iconMap && iconMap[String(icon)]) || "🌡️";
+		}
+
+		function render(data) {
+			const cityName = data.city || "未知城市";
+			const district = data.district && data.district !== cityName ? ` · ${data.district}` : "";
+			const temp = data.temperature != null ? `${data.temperature}°` : "--";
+			const alertHtml = (data.alerts && data.alerts.length > 0)
+				? `<div class="mt-2 pt-2 border-t border-neutral-200 dark:border-neutral-700 text-xs text-amber-600 dark:text-amber-400 leading-relaxed">⚠️ ${data.alerts[0].title}</div>`
+				: "";
+
+			container.innerHTML = `
+				<div class="flex items-center justify-between gap-2">
+					<div class="min-w-0">
+						<div class="text-sm text-neutral-500 dark:text-neutral-400 truncate">${cityName}${district}</div>
+						<div class="flex items-baseline gap-1 mt-0.5">
+							<span class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">${temp}</span>
+							<span class="text-sm text-neutral-600 dark:text-neutral-300">${data.weather || ""}</span>
+						</div>
+						<div class="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
+							湿度 ${data.humidity ?? "--"}% · ${data.wind_direction || ""}${data.wind_power || ""}
+						</div>
+					</div>
+					<div class="text-4xl shrink-0" title="${data.weather || ""}">${emoji(data.weather_icon)}</div>
+				</div>
+				${alertHtml}
+			`;
+		}
+
+		async function load() {
+			try {
+				// 本地缓存优先（swup 导航 / 刷新时不重复请求）
+				try {
+					const cached = localStorage.getItem(CACHE_KEY);
+					if (cached) {
+						const parsed = JSON.parse(cached);
+						if (parsed && parsed.ts && Date.now() - parsed.ts < TTL && parsed.data) {
+							render(parsed.data);
+							return;
+						}
+					}
+				} catch (e) { /* localStorage 不可用时忽略 */ }
+
+				const params = city ? `?city=${encodeURIComponent(city)}` : "";
+				const res = await fetch(WEATHER_URL + params, { signal: AbortSignal.timeout(8000) });
+				if (!res.ok) throw new Error("HTTP " + res.status);
+				const data = await res.json();
+				if (!data || !data.city) throw new Error("bad payload");
+
+				try {
+					localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+				} catch (e) { /* 忽略 */ }
+
+				render(data);
+			} catch (err) {
+				// 失败降级：保留上次成功数据（若存在），否则显示提示
+				try {
+					const cached = localStorage.getItem(CACHE_KEY);
+					if (cached) {
+						const parsed = JSON.parse(cached);
+						if (parsed && parsed.data) {
+							render(parsed.data);
+							return;
+						}
+					}
+				} catch (e) { /* 忽略 */ }
+				container.innerHTML =
+					'<div class="text-sm text-neutral-400 dark:text-neutral-500 py-3">天气获取失败</div>';
+			}
+		}
+
+		load();
+	})();
+</script>
