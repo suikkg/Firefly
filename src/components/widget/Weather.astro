@@ -90,8 +90,8 @@ const iconMap: Record<string, string> = {
 
 <script is:inline data-swup-ignore-script define:vars={{ city, refreshMinutes, iconMap }}>
 	(function () {
-		const container = document.getElementById("weather-widget-content");
-		if (!container) return;
+		const containers = document.querySelectorAll("#weather-widget-content");
+		if (containers.length === 0) return;
 
 		const WEATHER_URL = "https://uapis.cn/api/v1/misc/weather";
 		const CACHE_KEY = "kk-weather-cache";
@@ -101,7 +101,7 @@ const iconMap: Record<string, string> = {
 			return (iconMap && iconMap[String(icon)]) || "🌡️";
 		}
 
-		function render(data) {
+		function render(container, data) {
 			const cityName = data.city || "未知城市";
 			const district = data.district && data.district !== cityName ? ` · ${data.district}` : "";
 			const temp = data.temperature != null ? `${data.temperature}°` : "--";
@@ -130,42 +130,47 @@ const iconMap: Record<string, string> = {
 		async function load() {
 			try {
 				// 本地缓存优先（swup 导航 / 刷新时不重复请求）
+				let data = null;
 				try {
 					const cached = localStorage.getItem(CACHE_KEY);
 					if (cached) {
 						const parsed = JSON.parse(cached);
 						if (parsed && parsed.ts && Date.now() - parsed.ts < TTL && parsed.data) {
-							render(parsed.data);
-							return;
+							data = parsed.data;
 						}
 					}
 				} catch (e) { /* localStorage 不可用时忽略 */ }
 
-				const params = city ? `?city=${encodeURIComponent(city)}` : "";
-				const res = await fetch(WEATHER_URL + params, { signal: AbortSignal.timeout(8000) });
-				if (!res.ok) throw new Error("HTTP " + res.status);
-				const data = await res.json();
-				if (!data || !data.city) throw new Error("bad payload");
+				if (!data) {
+					const params = city ? `?city=${encodeURIComponent(city)}` : "";
+					const res = await fetch(WEATHER_URL + params, { signal: AbortSignal.timeout(8000) });
+					if (!res.ok) throw new Error("HTTP " + res.status);
+					data = await res.json();
+					if (!data || !data.city) throw new Error("bad payload");
 
-				try {
-					localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
-				} catch (e) { /* 忽略 */ }
+					try {
+						localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+					} catch (e) { /* 忽略 */ }
+				}
 
-				render(data);
+				containers.forEach((c) => render(c, data));
 			} catch (err) {
 				// 失败降级：保留上次成功数据（若存在），否则显示提示
+				let fallback = null;
 				try {
 					const cached = localStorage.getItem(CACHE_KEY);
 					if (cached) {
 						const parsed = JSON.parse(cached);
-						if (parsed && parsed.data) {
-							render(parsed.data);
-							return;
-						}
+						if (parsed && parsed.data) fallback = parsed.data;
 					}
 				} catch (e) { /* 忽略 */ }
-				container.innerHTML =
-					'<div class="text-sm text-neutral-400 dark:text-neutral-500 py-3">天气获取失败</div>';
+
+				containers.forEach((c) => {
+					if (fallback) render(c, fallback);
+					else
+						c.innerHTML =
+							'<div class="text-sm text-neutral-400 dark:text-neutral-500 py-3">天气获取失败</div>';
+				});
 			}
 		}
 

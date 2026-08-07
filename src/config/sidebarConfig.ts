@@ -274,6 +274,23 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 			showOnPostPage: true,
 		},
 		{
+			// 组件类型：天气组件（uapis.cn 免费天气接口，前端直连 + localStorage 缓存）
+			type: "weather",
+			// 是否启用该组件
+			enable: true,
+			// 是否在文章详情页显示
+			showOnPostPage: true,
+			// 组件专属配置
+			specificConfig: {
+				weather: {
+					// 查询城市，留空则用接口默认（IP 定位）
+					city: "南京",
+					// 缓存刷新间隔（分钟）
+					refreshMinutes: 30,
+				},
+			},
+		},
+		{
 			// 组件类型：分类组件
 			type: "categories",
 			// 是否启用该组件
