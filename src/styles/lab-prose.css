@@ -1,0 +1,563 @@
+/* ==========================================================================
+   新版界面的正文排版
+   --------------------------------------------------------------------------
+   文章页与「关于」等 Markdown 页面共用。抽成独立文件而不是留在页面的
+   scoped <style> 里，是因为多个页面都要渲染正文，复制一份三百行的样式
+   迟早会走样。
+   ========================================================================== */
+
+/* ══════════════════════════════════════════════════════
+   正文
+   ══════════════════════════════════════════════════════ */
+/* 正文容器与标题区同宽同轴，行长再由子元素单独收窄——
+   这样正文的左边缘和大标题严丝合缝，右侧空出来留给目录轨 */
+.prose {
+	max-width: var(--page-max);
+	margin-inline: auto;
+	background: transparent;
+	padding: 0 var(--gutter) clamp(4rem, 10vw, 8rem);
+	font-size: 1.0625rem;
+	/* CJK 需要比拉丁更松的行距才不显得压抑 */
+	line-height: 1.86;
+	letter-spacing: 0.012em;
+	color: var(--ink);
+}
+
+/* remark-sectionize 会把正文按标题层层包进 <section>，
+   所以限宽不能挂在直接子元素上——section 自身必须透传全宽，
+   由具体的文字块各自收窄行长 */
+.prose section {
+	max-width: none;
+}
+
+/* 块级公式默认会在整个容器里居中，导致它飘到正文右侧；
+   收进行长内再居中，公式才和正文同轴 */
+.prose .math-display,
+.prose .katex-display {
+	max-width: var(--measure);
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding-bottom: 0.3rem;
+}
+
+.prose p,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6,
+.prose ul,
+.prose ol,
+.prose blockquote,
+.prose hr {
+	max-width: var(--measure);
+}
+
+/* 图片、代码块、表格越过行长限制，给密集正文一个呼吸口 */
+.prose figure,
+.prose .expressive-code,
+.prose table {
+	max-width: min(100%, calc(var(--measure) + 11rem));
+}
+
+/* expressive-code 内部也用 figure.frame 包代码，
+   会被上面那条给图片写的限宽卡住，于是代码框比外层容器窄一圈，
+   在容器边缘露出一条白边 */
+.prose .expressive-code figure {
+	max-width: none;
+	margin: 0;
+}
+
+.prose p {
+	margin: 0 0 1.5em;
+	text-wrap: pretty;
+}
+
+/* 标题上方留白远大于下方，靠留白而不是分隔线划分章节 */
+.prose h2 {
+	position: relative;
+	margin: 2.6em 0 0.9em;
+	font-size: 1.65rem;
+	font-weight: 700;
+	line-height: 1.28;
+	letter-spacing: -0.02em;
+	text-wrap: balance;
+}
+
+/* 章节记号挂在版心外，不占正文行长 */
+.prose h2::before {
+	content: "";
+	position: absolute;
+	left: -1.5rem;
+	top: 0.62em;
+	width: 0.6rem;
+	height: 1px;
+	background: var(--accent);
+}
+
+.prose h3 {
+	margin: 2em 0 0.7em;
+	font-size: 1.28rem;
+	font-weight: 650;
+	line-height: 1.35;
+	letter-spacing: -0.014em;
+	text-wrap: balance;
+}
+
+.prose h4 {
+	margin: 1.7em 0 0.6em;
+	font-size: 1.08rem;
+	font-weight: 650;
+}
+
+.prose a {
+	color: inherit;
+	text-decoration: none;
+	background-image: linear-gradient(var(--accent), var(--accent));
+	background-repeat: no-repeat;
+	background-position: 0 100%;
+	background-size: 100% 1px;
+	transition: background-size 0.35s var(--ease-out);
+}
+
+.prose a:hover {
+	background-size: 100% 0.35em;
+}
+
+.prose strong { font-weight: 700; }
+
+/* rehype-autolink-headings 会在标题尾部塞一个 "#"，
+   默认状态下把它藏进左侧留白，指到标题才显形 */
+.prose .anchor {
+	position: absolute;
+	left: -2.6rem;
+	top: 0.5em;
+	background: none;
+	opacity: 0;
+	text-decoration: none;
+	transition: opacity 0.3s var(--ease-out);
+}
+
+.prose .anchor-icon {
+	font-family: var(--mono);
+	font-size: 0.85rem;
+	font-weight: 400;
+	color: var(--accent);
+}
+
+.prose h2:hover .anchor,
+.prose h3:hover .anchor,
+.prose h4:hover .anchor,
+.prose .anchor:focus-visible {
+	opacity: 1;
+}
+
+.prose h3,
+.prose h4 {
+	position: relative;
+}
+
+.prose ul,
+.prose ol {
+	margin: 0 0 1.5em;
+	padding-left: 1.4em;
+}
+
+.prose li { margin-bottom: 0.45em; }
+
+.prose li::marker { color: var(--accent); }
+
+/* 引用：靠一条竖线和字体切换建立层级，不用底色块 */
+.prose blockquote {
+	margin: 2em 0;
+	padding-left: 1.4rem;
+	border-left: 2px solid var(--accent);
+	font-size: 1.08em;
+	line-height: 1.7;
+	color: var(--ink-soft);
+}
+
+.prose blockquote p:last-child { margin-bottom: 0; }
+
+.prose code {
+	font-family: var(--mono);
+	font-size: 0.88em;
+	padding: 0.15em 0.4em;
+	border-radius: 3px;
+	background: var(--hair);
+}
+
+/* 代码块由 expressive-code 负责配色，这里只处理外框与出血 */
+.prose .expressive-code {
+	margin: 2em 0;
+	overflow: hidden;
+}
+
+.prose .expressive-code code {
+	background: none;
+	padding: 0;
+	font-size: inherit;
+}
+
+/* 图片与代码块允许溢出版心，给密集正文一个呼吸口 */
+.prose img {
+	display: block;
+	width: 100%;
+	height: auto;
+	margin: 2em 0;
+	border-radius: 2px;
+}
+
+.prose figure { margin: 2.4em 0; }
+
+.prose figcaption {
+	margin-top: 0.7rem;
+	font-family: var(--mono);
+	font-size: 0.7rem;
+	letter-spacing: 0.06em;
+	color: var(--ink-soft);
+	text-align: center;
+}
+
+.prose hr {
+	margin: 3em 0;
+	border: 0;
+	border-top: 1px solid var(--hair);
+}
+
+/* 表格
+   width:100% 会把短内容的列平摊到整个出血宽度，
+   一行里"§9.1.4"和"1 dB"隔着几百像素，眼睛根本连不起来。
+   改成按内容定宽；display:block 同时让它自己横向滚动，
+   不至于把页面撑出横向滚动条。 */
+.prose table {
+	display: block;
+	width: fit-content;
+	max-width: 100%;
+	margin: 2em 0;
+	overflow-x: auto;
+	border-collapse: collapse;
+	font-size: 0.9em;
+	background: var(--card);
+	border-radius: var(--radius-sm);
+	box-shadow: var(--lift-1);
+}
+
+.prose th,
+.prose td {
+	padding: 0.68em 1.1em;
+	border-bottom: 1px solid var(--hair);
+	text-align: left;
+	white-space: nowrap;
+}
+
+/* 表头单独给一层浅色，和数据行拉开 */
+.prose thead th {
+	position: sticky;
+	top: 0;
+	background: color-mix(in oklch, var(--accent) 8%, var(--card));
+	font-family: var(--mono);
+	font-size: 0.72em;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+	font-weight: 400;
+}
+
+.prose tbody tr:last-child td {
+	border-bottom: 0;
+}
+
+.prose tbody tr:hover td {
+	background: var(--accent-wash);
+}
+
+/* 代码块也按 v2 的卡片语言给一层承载面 */
+.prose .expressive-code {
+	max-width: 100%;
+	border-radius: var(--radius-sm);
+	box-shadow: var(--lift-1);
+}
+
+/* ── 加密文章的解锁界面 ───────────────────────────────
+   组件本身用的是 Tailwind 工具类，而概念稿不引 Tailwind，
+   所以这里得把这套界面完整重画一遍 */
+.prose #password-ui {
+	display: flex;
+	justify-content: center;
+	padding: 3rem 0;
+}
+
+.prose #password-ui > div {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.75rem;
+	width: 100%;
+	max-width: 24rem;
+	padding: 2.25rem 2rem;
+	border: 1px solid var(--hair);
+	border-radius: 3px;
+}
+
+.prose #password-ui h2 {
+	margin: 0.4rem 0 0;
+	font-size: 1.1rem;
+	font-weight: 650;
+	letter-spacing: -0.01em;
+}
+
+.prose #password-ui p {
+	margin: 0;
+	max-width: none;
+	font-size: 0.85rem;
+	line-height: 1.6;
+	text-align: center;
+	color: var(--ink-soft);
+}
+
+.prose #password-ui svg {
+	width: 2.4rem;
+	height: 2.4rem;
+	color: var(--accent);
+}
+
+.prose #password-form {
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+	width: 100%;
+	margin-top: 0.5rem;
+}
+
+.prose #password-input {
+	width: 100%;
+	padding: 0.6rem 0.8rem;
+	border: 1px solid var(--hair);
+	border-radius: 3px;
+	background: none;
+	color: var(--ink);
+	font-family: var(--mono);
+	font-size: 0.85rem;
+	outline: none;
+	transition: border-color 0.3s var(--ease-out);
+}
+
+.prose #password-input:focus {
+	border-color: var(--accent);
+}
+
+.prose #password-form button {
+	width: 100%;
+	padding: 0.6rem 0.8rem;
+	border: 1px solid var(--ink);
+	border-radius: 3px;
+	background: var(--ink);
+	color: var(--ground);
+	font-family: var(--mono);
+	font-size: 0.75rem;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	cursor: pointer;
+	transition:
+		background-color 0.3s var(--ease-out),
+		color 0.3s var(--ease-out);
+}
+
+.prose #password-form button:hover {
+	background: none;
+	color: var(--ink);
+}
+
+.prose #password-error {
+	font-size: 0.78rem;
+	color: oklch(0.62 0.19 25);
+}
+
+.prose #password-error.hidden,
+.prose #decrypted-content.hidden {
+	display: none;
+}
+
+/* 解锁界面里的 h2 不是正文章节，不应该带左侧记号 */
+.prose #password-ui h2::before {
+	display: none;
+}
+
+/* ── 评论区 ──────────────────────────────────────────
+   组件外壳用的是 Tailwind 的 card-base，这里不引 Tailwind，
+   所以自己给一层容器；Waline 自身的样式由它按需加载 */
+.comments {
+	max-width: var(--page-max);
+	margin: 0 auto;
+	padding: clamp(2rem, 5vw, 3.5rem) var(--gutter) 0;
+}
+
+.comments-title {
+	padding-bottom: 1rem;
+	margin: 0 0 1.5rem;
+	border-bottom: 1px solid var(--hair);
+}
+
+.comments #post-comments {
+	max-width: var(--measure);
+}
+
+/* 组件里那圈装饰性背景圆在这套语言里是多余的 */
+.comments #post-comments > .absolute {
+	display: none;
+}
+
+/* ── GitHub 仓库卡片 ─────────────────────────────────
+   插件只吐结构不带样式，现有主题的那套挂在全局表里。
+   这里按概念稿的语言重画：细线框 + 等宽元信息，不用圆角卡片。 */
+.prose a.card-github {
+	display: block;
+	max-width: var(--measure);
+	margin: 2em 0;
+	padding: 1.1rem 1.25rem;
+	border: 1px solid var(--hair);
+	border-radius: 3px;
+	background: none;
+	text-decoration: none;
+	color: inherit;
+	transition: border-color 0.35s var(--ease-out);
+}
+
+.prose a.card-github:hover {
+	border-color: var(--accent);
+}
+
+/* .gc-titlebar-left 是普通 div，不设 flex 的话 owner / 斜杠 / repo
+   会各占一行 */
+.prose .gc-titlebar,
+.prose .gc-titlebar-left {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	font-size: 1.05rem;
+	font-weight: 650;
+	letter-spacing: -0.015em;
+}
+
+.prose .gc-owner {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+}
+
+.prose .gc-user { color: var(--ink-soft); font-weight: 400; }
+.prose .gc-divider { color: var(--ink-mute); }
+
+.prose .gc-avatar {
+	width: 1.15rem;
+	height: 1.15rem;
+	border-radius: 50%;
+	background-size: cover;
+	background-position: center;
+	background-color: var(--hair);
+}
+
+.prose .gc-description {
+	margin-top: 0.55rem;
+	font-size: 0.9rem;
+	line-height: 1.6;
+	color: var(--ink-soft);
+}
+
+.prose .gc-infobar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1.4rem;
+	margin-top: 0.9rem;
+	padding-top: 0.7rem;
+	border-top: 1px solid var(--hair);
+	font-family: var(--mono);
+	font-size: 0.7rem;
+	letter-spacing: 0.08em;
+	color: var(--ink-soft);
+}
+
+/* 数据未回来之前是 "00K" 之类的占位，先压暗避免闪烁刺眼 */
+.prose a.card-github.fetch-waiting .gc-infobar,
+.prose a.card-github.fetch-waiting .gc-description {
+	opacity: 0.4;
+}
+
+.prose .github-logo { display: none; }
+
+/* ── 图表（Mermaid / PlantUML）────────────────────────
+   构建期会同时产出亮色与深色两套 SVG，靠 CSS 决定显示哪一套；
+   概念稿不引全局样式表，这套规则必须自带，否则暗色页面上
+   会露出亮色版本，而且 SVG 会被拉伸到整个容器宽度 */
+.prose .diagram-container {
+	max-width: min(100%, calc(var(--measure) + 11rem));
+	margin: 2.4em 0;
+	padding: 1.25rem;
+	border: 1px solid var(--hair);
+	border-radius: 3px;
+	background: color-mix(in oklch, var(--ink) 3%, transparent);
+}
+
+.prose .mermaid-wrapper { text-align: center; }
+
+.prose .mermaid-svg-light,
+.prose .mermaid-svg-dark {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: 100%;
+	overflow: hidden;
+}
+
+.prose .mermaid-svg-light svg,
+.prose .mermaid-svg-dark svg {
+	display: block;
+	/* 用 width:100% + max-height 会把 SVG 撑成整条，图形缩在中间
+	   两侧留出大片底色；按自身比例缩放才不会出现这种信箱边 */
+	width: auto;
+	height: auto;
+	max-width: 100%;
+	/* 不限高的话一张流程图能吃掉两屏；纵向图表按视口给一点余量，
+	   否则窄高的流程图被压到 420px 后字就看不清了 */
+	max-height: min(66vh, 560px);
+}
+
+.prose .mermaid-svg-dark { display: none; }
+html.dark .prose .mermaid-svg-light { display: none; }
+html.dark .prose .mermaid-svg-dark { display: flex; }
+
+.prose .plantuml-image {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	max-height: 420px;
+	object-fit: contain;
+	margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+	.prose .mermaid-svg-light svg,
+	.prose .mermaid-svg-dark svg,
+	.prose .plantuml-image {
+		max-height: 400px;
+	}
+}
+
+
+/* ── 裸 SVG 兜底 ────────────────────────────────────────────────
+   正文里可能出现直接写在 Markdown/MDX 里的 <svg>。这些内容往往是
+   按旧主题的 Tailwind 工具类（w-4 h-4 之类）写的，新版界面不加载
+   Tailwind，尺寸类全部失效，图标会撑到原始大小占满半屏。
+   这里给一个上限；真正需要大图的图表有各自的容器规则覆盖它。 */
+.prose svg:not([class*="mermaid"]):not([class*="katex"]) {
+	max-width: 1.35em;
+	max-height: 1.35em;
+}
+
+.prose .expressive-code svg,
+.prose .diagram-container svg,
+.prose figure svg {
+	max-width: 100%;
+	max-height: none;
+}

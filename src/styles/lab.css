@@ -82,13 +82,6 @@ html {
 
 body {
 	margin: 0;
-	/* 按列铺满视口：内容不足一屏时，靠中间区域撑开把页脚顶到底部，
-	   否则固定的壁纸层会从页脚下方露出来。
-	   注意这条必须写在全局表里——Astro 的 scoped 样式不会给 <body>
-	   加 scope 属性，写在组件 <style> 里不会生效。 */
-	display: flex;
-	flex-direction: column;
-	min-height: 100svh;
 	/* 底色只挂在 html 上：body 若也铺一层不透明背景，
 	   会把 z-index 为负的固定壁纸层整个盖住 */
 	background: transparent;

@@ -30,6 +30,7 @@ const wallpaperMobile = pickWallpaper("mobile");
 		{wallpaperMobile && (
 			<link rel="preload" as="image" href={wallpaperMobile} media="(max-width: 768px)" />
 		)}
+		<slot name="head" />
 	</head>
 
 	<body>
@@ -39,6 +40,7 @@ const wallpaperMobile = pickWallpaper("mobile");
 			aria-hidden="true"
 		></div>
 
+		<div class="shell">
 		<header class="banner">
 			<div class="bar">
 				<nav class="nav">
@@ -85,6 +87,7 @@ const wallpaperMobile = pickWallpaper("mobile");
 				</a>
 			</div>
 		</footer>
+		</div>
 
 		<style>
 			.wallpaper {
@@ -101,6 +104,15 @@ const wallpaperMobile = pickWallpaper("mobile");
 					background-image: var(--wp-mobile);
 					background-position: center top;
 				}
+			}
+
+			/* 铺满视口高度、页脚吸底。放在这一层而不是 body 上：
+			   给 body 加 flex 会让所有 margin-inline:auto 的块（比如文章正文）
+			   从「撑满并居中」变成「收缩到内容宽度并居中」，正文会莫名变窄 */
+			.shell {
+				display: flex;
+				flex-direction: column;
+				min-height: 100svh;
 			}
 
 			.banner {

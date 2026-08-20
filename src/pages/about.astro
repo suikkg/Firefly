@@ -1,25 +1,31 @@
 ---
-
+// 关于：渲染 spec/about 的 Markdown，正文样式与文章页共用
 import { getEntry, render } from "astro:content";
-import Markdown from "@components/common/Markdown.astro";
+import KatexManager from "@/components/features/KatexManager.astro";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import LabPage from "@/layouts/LabPage.astro";
+import "@/styles/lab-prose.css";
 
 const aboutPost = await getEntry("spec", "about");
-
 if (!aboutPost) {
 	throw new Error("About page content not found");
 }
-
 const { Content } = await render(aboutPost);
 ---
-<MainGridLayout title={i18n(I18nKey.about)} description={i18n(I18nKey.about)}>
-    <div class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-32">
-        <div class="card-base z-10 px-9 py-6 relative w-full ">
-            <Markdown class="mt-2">
-                <Content />
-            </Markdown>
-        </div>
-    </div>
-</MainGridLayout>
+
+<LabPage title={i18n(I18nKey.about)} description={i18n(I18nKey.about)}>
+	<KatexManager slot="head" />
+	<article class="prose lab-prose about">
+		<Content />
+	</article>
+</LabPage>
+
+<style>
+	/* 关于页没有独立的 masthead，正文直接从内容区开始，
+	   所以把 .prose 自带的左右留白去掉，交给 LabPage 的 sheet 统一控制 */
+	.about {
+		padding-left: 0;
+		padding-right: 0;
+	}
+</style>
