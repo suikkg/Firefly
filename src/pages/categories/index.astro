@@ -1,69 +1,113 @@
 ---
+// 分类总览：每个分类一张卡片，点进去落到 /archive/?category=…
 import { Icon } from "astro-icon/components";
-import I18nKey from "@/i18n/i18nKey";
-import { i18n } from "@/i18n/translation";
-import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import LabPage from "@/layouts/LabPage.astro";
 import { getCategoryList } from "@/utils/content-utils";
+import { hueFromString } from "@/utils/lab-utils";
 
 const categories = await getCategoryList();
-const totalPosts = categories.reduce((sum, cat) => sum + cat.count, 0);
+const total = categories.reduce((sum, c) => sum + c.count, 0);
+const max = Math.max(1, ...categories.map((c) => c.count));
 ---
 
-<MainGridLayout title={i18n(I18nKey.categories)}>
-    <!-- 页面标题 -->
-    <div class="card-base px-8 py-6 mb-4">
-        <div class="text-2xl font-bold text-(--primary) mb-2">
-            {i18n(I18nKey.categories)}
-        </div>
-        <p class="text-30 text-sm">
-            {i18n(I18nKey.allCategories)} · {totalPosts} {i18n(I18nKey.postsCount)}
-        </p>
-    </div>
+<LabPage
+	title="分类"
+	lede={`${categories.length} 个分类，覆盖 ${total} 篇文章。`}
+>
+	{
+		categories.length === 0 ? (
+			<p class="empty">还没有任何分类</p>
+		) : (
+			<div class="cats">
+				{categories.map((c) => (
+					<a class="cat card" href={c.url} style={`--h:${hueFromString(c.name)}`}>
+						<span class="cat-count micro">{String(c.count).padStart(2, "0")}</span>
+						<h2 class="cat-name">{c.name}</h2>
+						{/* 条形长度表示占比，让分布一眼可读 */}
+						<span class="cat-bar" style={`--pct:${(c.count / max) * 100}%`} />
+						<Icon is:inline name="lucide:arrow-up-right" class="cat-arrow" />
+					</a>
+				))}
+			</div>
+		)
+	}
+</LabPage>
 
-    <!-- 分类卡片列表 -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-        {
-            categories.map((category, index) => (
-                <a
-                    href={category.url}
-                    class="card-base p-6 flex items-center gap-4 group onload-animation"
-                    style={`animation-delay: calc(var(--content-delay) + ${index * 50}ms);`}
-                >
-                    <div class="shrink-0 w-14 h-14 rounded-full bg-(--primary)/10 group-hover:bg-(--primary)/20 flex items-center justify-center transition-colors">
-                        <Icon is:inline
-                            name="lucide:folder-open"
-                            class="text-3xl text-(--primary)"
-                        />
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <h2 class="text-lg font-bold text-90 truncate group-hover:text-(--primary) transition-colors" title={category.name}>
-                            {category.name}
-                        </h2>
-                        <p class="text-sm text-30 mt-1 group-hover:text-(--primary)/60 transition-colors">
-                            {category.count} {i18n(I18nKey.postsCount)}
-                        </p>
-                    </div>
-                    <div class="shrink-0">
-                        <Icon is:inline
-                            name="lucide:chevron-right"
-                            class="text-2xl text-30 group-hover:text-(--primary) transition-colors "
-                        />
-                    </div>
-                </a>
-            ))
-        }
-    </div>
+<style>
+	.cats {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+		gap: 1rem;
+	}
 
-    <!-- 空状态 -->
-    {
-        categories.length === 0 && (
-            <div class="card-base px-8 py-12 text-center">
-                <Icon is:inline
-                    name="lucide:folder-x"
-                    class="text-5xl text-30 mx-auto mb-4"
-                />
-                <p class="text-30">{i18n(I18nKey.noData)}</p>
-            </div>
-        )
-    }
-</MainGridLayout>
+	.cat {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 1.25rem 1.35rem 1.5rem;
+		color: inherit;
+		text-decoration: none;
+		overflow: hidden;
+	}
+
+	/* 顶边用分类名派生的色相，让卡片之间有区分又不脱离整体色调 */
+	.cat::before {
+		content: "";
+		position: absolute;
+		inset: 0 0 auto;
+		height: 3px;
+		background: oklch(0.72 0.12 var(--h));
+	}
+
+	.cat-count {
+		font-family: var(--mono);
+		font-size: 1.6rem;
+		font-weight: 500;
+		letter-spacing: -0.02em;
+		color: oklch(0.58 0.13 var(--h));
+		line-height: 1;
+	}
+
+	.cat-name {
+		margin: 0;
+		font-size: 1.05rem;
+		font-weight: 650;
+		letter-spacing: -0.015em;
+		text-wrap: pretty;
+	}
+
+	.cat-bar {
+		display: block;
+		height: 2px;
+		width: var(--pct);
+		margin-top: auto;
+		border-radius: 999px;
+		background: oklch(0.72 0.12 var(--h) / 0.5);
+		transition: width 0.6s var(--ease-out);
+	}
+
+	.cat-arrow {
+		position: absolute;
+		right: 1.1rem;
+		bottom: 1.1rem;
+		font-size: 0.95rem;
+		color: oklch(0.58 0.13 var(--h));
+		opacity: 0;
+		transform: translate3d(-0.25rem, 0.25rem, 0);
+		transition:
+			opacity 0.35s var(--ease-out),
+			transform 0.45s var(--spring);
+	}
+
+	@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+		.cat:hover { transform: translateY(-3px); box-shadow: var(--lift-3); }
+		.cat:hover .cat-arrow { opacity: 1; transform: none; }
+	}
+
+	.empty {
+		padding: 4rem 1rem;
+		text-align: center;
+		color: var(--ink-soft);
+	}
+</style>

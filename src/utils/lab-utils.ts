@@ -22,3 +22,19 @@ export function usableImage(src: string): string {
 	if (src.startsWith("/")) return src;
 	return "";
 }
+
+import { backgroundWallpaper } from "@/config";
+
+/**
+ * 取壁纸地址。配置里 src 可能是字符串、数组，或
+ * { desktop, mobile, playerUrl } 三种形态。
+ */
+export function pickWallpaper(kind: "desktop" | "mobile"): string {
+	const src = backgroundWallpaper.src;
+	if (!src) return "";
+	const first = (v: string | string[] | undefined): string =>
+		Array.isArray(v) ? (v[0] ?? "") : (v ?? "");
+	if (typeof src === "string") return src;
+	if (Array.isArray(src)) return first(src);
+	return first(src[kind]) || first(src.desktop);
+}

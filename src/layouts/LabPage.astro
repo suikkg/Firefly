@@ -1,0 +1,274 @@
+---
+// 新版界面的通用外壳（首页之外的页面用）
+// 首页有整屏 hero，这里改成一条紧凑的壁纸横幅 + 页面标题，
+// 保持同一套语言但不必每页都占满一屏。
+import { Icon } from "astro-icon/components";
+import LabHead from "@/components/lab/LabHead.astro";
+import { siteConfig } from "@/config";
+import { pickWallpaper } from "@/utils/lab-utils";
+import "@/styles/lab.css";
+
+interface Props {
+	title: string;
+	description?: string;
+	/** 标题下方的一行说明 */
+	lede?: string;
+}
+
+const { title, description, lede } = Astro.props;
+
+const wallpaperDesktop = pickWallpaper("desktop");
+const wallpaperMobile = pickWallpaper("mobile");
+---
+
+<html lang="zh-CN">
+	<head>
+		<LabHead title={title} description={description} />
+		{wallpaperDesktop && (
+			<link rel="preload" as="image" href={wallpaperDesktop} media="(min-width: 769px)" />
+		)}
+		{wallpaperMobile && (
+			<link rel="preload" as="image" href={wallpaperMobile} media="(max-width: 768px)" />
+		)}
+	</head>
+
+	<body>
+		<div
+			class="wallpaper"
+			style={`--wp-desktop:url("${wallpaperDesktop}"); --wp-mobile:url("${wallpaperMobile || wallpaperDesktop}")`}
+			aria-hidden="true"
+		></div>
+
+		<header class="banner">
+			<div class="bar">
+				<nav class="nav">
+					<a class="brand" href="/">
+						<Icon is:inline name="lucide:sparkles" />
+						{siteConfig.title}
+					</a>
+					<a href="/archive/">归档</a>
+					<a href="/categories/">分类</a>
+					<a href="/tags/">标签</a>
+					<a href="/about/">关于</a>
+				</nav>
+				<div class="actions">
+					<a href="/classic/" class="circle-btn" aria-label="旧版界面" title="旧版界面">
+						<Icon is:inline name="lucide:layout-panel-left" />
+					</a>
+					<button id="theme-toggle" class="circle-btn" type="button" aria-label="切换明暗">
+						<Icon is:inline name="lucide:sun-moon" />
+					</button>
+				</div>
+			</div>
+
+			<div class="banner-title">
+				<h1>{title}</h1>
+				{lede && <p>{lede}</p>}
+			</div>
+		</header>
+
+		<main class="sheet">
+			<div class="sheet-inner">
+				<slot />
+			</div>
+		</main>
+
+		<footer class="footer">
+			<div class="footer-inner">
+				<a href="/" class="footer-link">
+					<Icon is:inline name="lucide:arrow-left" />
+					<span>回到首页</span>
+				</a>
+				<a href="/classic/" class="footer-link">
+					<Icon is:inline name="lucide:layout-panel-left" />
+					<span>切换到旧版界面</span>
+				</a>
+			</div>
+		</footer>
+
+		<style>
+			.wallpaper {
+				position: fixed;
+				inset: 0;
+				z-index: -1;
+				background-image: var(--wp-desktop);
+				background-size: cover;
+				background-position: center 25%;
+			}
+
+			@media (max-width: 768px) {
+				.wallpaper {
+					background-image: var(--wp-mobile);
+					background-position: center top;
+				}
+			}
+
+			.banner {
+				position: relative;
+				z-index: 1;
+				display: flex;
+				flex-direction: column;
+				gap: clamp(2rem, 8vh, 5rem);
+				min-height: clamp(20rem, 42vh, 26rem);
+				padding: 1.5rem var(--gutter) 2.5rem;
+			}
+
+			.bar {
+				position: relative;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+			}
+
+			.nav {
+				display: flex;
+				align-items: center;
+				gap: 0.4rem;
+				min-width: 0;
+			}
+
+			/* 窄屏让导航横向滚动，而不是折成两排 */
+			@media (max-width: 640px) {
+				.nav {
+					overflow-x: auto;
+					scrollbar-width: none;
+				}
+				.nav::-webkit-scrollbar { display: none; }
+				.nav > * { flex-shrink: 0; }
+			}
+
+			.nav a {
+				padding: 0.5rem 0.85rem;
+				border-radius: 999px;
+				background: var(--card-soft);
+				backdrop-filter: blur(12px);
+				box-shadow: var(--lift-1);
+				font-size: 0.82rem;
+				color: var(--ink);
+				text-decoration: none;
+				white-space: nowrap;
+				transition:
+					background-color 0.3s var(--ease-out),
+					color 0.3s var(--ease-out);
+			}
+
+			.nav a:hover { background: var(--accent); color: #fff; }
+
+			.brand {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5rem;
+				font-weight: 650;
+			}
+
+			.brand :global(svg) { color: var(--accent-deep); }
+			.brand:hover :global(svg) { color: #fff; }
+
+			.actions { display: flex; gap: 0.6rem; }
+
+			.banner-title {
+				position: relative;
+				margin-top: auto;
+			}
+
+			.banner-title h1 {
+				margin: 0;
+				font-size: clamp(2rem, 5.5vw, 3.6rem);
+				font-weight: 800;
+				letter-spacing: -0.035em;
+				line-height: 1.05;
+				color: #fff;
+				/* 壁纸亮部（天空）上白字很容易糊掉。压暗整块画面会在 banner
+				   底边切出硬边，所以改成给文字本身叠三层阴影：
+				   近处收边缘、中距离拉对比、远处做整体托底 */
+				text-shadow:
+					0 1px 2px rgb(16 34 28 / 0.5),
+					0 3px 10px rgb(16 34 28 / 0.42),
+					0 12px 44px rgb(16 34 28 / 0.5);
+				animation: fade-up 0.9s var(--ease-out) backwards;
+			}
+
+			.banner-title p {
+				max-width: 48ch;
+				margin: 0.7rem 0 0;
+				font-size: 0.95rem;
+				line-height: 1.7;
+				color: #fff;
+				font-weight: 500;
+				text-shadow:
+					0 1px 2px rgb(16 34 28 / 0.6),
+					0 2px 8px rgb(16 34 28 / 0.5),
+					0 8px 30px rgb(16 34 28 / 0.5);
+				text-wrap: pretty;
+				animation: fade-up 0.9s var(--ease-out) 0.1s backwards;
+			}
+
+			.sheet {
+				position: relative;
+				flex: 1;
+				min-height: 40vh;
+				padding: 0 var(--gutter) clamp(3rem, 8vw, 6rem);
+				/* 顶部渐变把插画收进纸色，往下彻底交给纸色；随内容滚动 */
+				background: linear-gradient(
+					to bottom,
+					transparent 0,
+					color-mix(in oklch, var(--ground) 88%, transparent) 90px,
+					var(--ground) 220px
+				);
+			}
+
+			.sheet-inner {
+				max-width: var(--page-max);
+				margin: 0 auto;
+				padding-top: clamp(2rem, 5vw, 3.5rem);
+			}
+
+			.footer {
+				position: relative;
+				padding: 2rem var(--gutter) 2.5rem;
+				border-top: 1px solid var(--hair);
+				/* 壁纸是 fixed 的，页脚不铺底色会被插画透上来 */
+				background: var(--ground);
+			}
+
+			.footer-inner {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				flex-wrap: wrap;
+				gap: 1rem;
+				max-width: var(--page-max);
+				margin: 0 auto;
+			}
+
+			.footer-link {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5rem;
+				font-size: 0.85rem;
+				color: var(--ink-soft);
+				text-decoration: none;
+				transition: color 0.3s var(--ease-out);
+			}
+
+			.footer-link:hover { color: var(--accent-deep); }
+		</style>
+
+		<script>
+			document.getElementById("theme-toggle")?.addEventListener("click", () => {
+				const dark = document.documentElement.classList.toggle("dark");
+				// 代码块配色跟着一起切
+				document.documentElement.setAttribute(
+					"data-theme",
+					dark ? "one-dark-pro" : "one-light",
+				);
+				try {
+					localStorage.setItem("theme", dark ? "dark" : "light");
+				} catch (e) {
+					/* 隐私模式下忽略 */
+				}
+			});
+		</script>
+	</body>
+</html>

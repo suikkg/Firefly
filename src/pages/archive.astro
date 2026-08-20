@@ -1,10 +1,248 @@
 ---
-import ArchivePanel from "@components/controls/ArchivePanel.astro";
-import I18nKey from "@i18n/i18nKey";
-import { i18n } from "@i18n/translation";
-import MainGridLayout from "@layouts/MainGridLayout.astro";
+// 归档：全量按年分组，构建期渲染；
+// 筛选（?tag= / ?category= / ?uncategorized=true）交给客户端脚本，
+// URL 约定与旧版一致，站内已有链接不会失效。
+import { Icon } from "astro-icon/components";
+import LabPage from "@/layouts/LabPage.astro";
+import { getSortedPostsList } from "@/utils/content-utils";
+
+const posts = (await getSortedPostsList())
+	.slice()
+	// 归档严格按时间倒序，不受置顶影响
+	.sort((a, b) => b.data.published.getTime() - a.data.published.getTime());
+
+const grouped = new Map<number, typeof posts>();
+for (const post of posts) {
+	const year = post.data.published.getFullYear();
+	if (!grouped.has(year)) grouped.set(year, []);
+	grouped.get(year)?.push(post);
+}
+const groups = [...grouped.entries()]
+	.map(([year, list]) => ({ year, list }))
+	.sort((a, b) => b.year - a.year);
+
+function monthDay(d: Date): string {
+	return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+}
 ---
 
-<MainGridLayout title={i18n(I18nKey.archive)}>
-  <ArchivePanel />
-</MainGridLayout>
+<LabPage title="归档" lede={`共 ${posts.length} 篇文章，按时间倒序排列。`}>
+	<!-- 筛选提示条：有筛选时由脚本填充并显示 -->
+	<div id="filter-bar" class="filter-bar" hidden>
+		<span class="micro">正在筛选</span>
+		<span class="filter-value" id="filter-value"></span>
+		<a href="/archive/" class="filter-clear">
+			<Icon is:inline name="lucide:x" />
+			<span>清除</span>
+		</a>
+	</div>
+
+	<p class="empty" id="empty" hidden>没有匹配的文章</p>
+
+	{
+		groups.map(({ year, list }) => (
+			<section class="year-group" data-year={year}>
+				<h2 class="year">
+					<span>{year}</span>
+					<span class="year-count micro">{list.length} 篇</span>
+				</h2>
+
+				<ul class="rows">
+					{list.map((post) => (
+						<li
+							class="row"
+							data-tags={JSON.stringify(post.data.tags)}
+							data-category={post.data.category || ""}
+						>
+							<a href={`/posts/${post.id}/`}>
+								<span class="row-date micro">{monthDay(post.data.published)}</span>
+								<span class="row-title">{post.data.title}</span>
+								<span class="row-cat micro">{post.data.category || "未分类"}</span>
+								<Icon is:inline name="lucide:arrow-up-right" class="row-arrow" />
+							</a>
+						</li>
+					))}
+				</ul>
+			</section>
+		))
+	}
+</LabPage>
+
+<style>
+	/* [hidden] 的 display:none 来自 UA 样式，会被下面的 display:flex 盖掉 */
+	.filter-bar[hidden],
+	.empty[hidden],
+	.year-group[hidden],
+	.row[hidden] {
+		display: none;
+	}
+
+	.filter-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		margin-bottom: 1.75rem;
+		padding: 0.75rem 1.1rem;
+		border-radius: 999px;
+		background: var(--card);
+		box-shadow: var(--lift-1);
+		width: fit-content;
+	}
+
+	.filter-value {
+		font-size: 0.92rem;
+		font-weight: 650;
+		color: var(--accent-deep);
+	}
+
+	.filter-clear {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.25rem 0.65rem;
+		border-radius: 999px;
+		background: var(--accent-wash);
+		color: var(--accent-deep);
+		font-size: 0.75rem;
+		text-decoration: none;
+		transition: background-color 0.3s var(--ease-out);
+	}
+
+	.filter-clear:hover { background: var(--accent); color: #fff; }
+
+	.empty {
+		padding: 4rem 1rem;
+		text-align: center;
+		color: var(--ink-soft);
+	}
+
+	.year-group { margin-bottom: clamp(2rem, 5vw, 3.25rem); }
+
+	/* 年份数字大而淡，作为时间轴上的刻度而不是标题 */
+	.year {
+		display: flex;
+		align-items: baseline;
+		gap: 0.85rem;
+		margin: 0 0 0.85rem;
+		font-family: var(--mono);
+		font-size: clamp(1.6rem, 3.4vw, 2.4rem);
+		font-weight: 500;
+		letter-spacing: -0.02em;
+		color: var(--accent-deep);
+	}
+
+	.year-count { color: var(--ink-mute); }
+
+	.rows {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		background: var(--card);
+		border-radius: var(--radius);
+		box-shadow: var(--lift-1);
+		overflow: hidden;
+	}
+
+	.row + .row { border-top: 1px solid var(--hair); }
+
+	.row a {
+		display: grid;
+		grid-template-columns: 3.6rem minmax(0, 1fr) auto 1.2rem;
+		align-items: center;
+		gap: 1rem;
+		padding: 0.9rem 1.25rem;
+		color: inherit;
+		text-decoration: none;
+		transition: background-color 0.25s var(--ease-out);
+	}
+
+	.row a:hover { background: var(--accent-wash); }
+
+	.row-date { color: var(--ink-mute); }
+
+	.row-title {
+		font-size: 0.98rem;
+		font-weight: 600;
+		letter-spacing: -0.012em;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.row-cat { color: var(--ink-soft); white-space: nowrap; }
+
+	.row-arrow {
+		color: var(--ink-mute);
+		opacity: 0;
+		transform: translate3d(-0.25rem, 0.25rem, 0);
+		transition:
+			opacity 0.3s var(--ease-out),
+			transform 0.4s var(--spring),
+			color 0.3s var(--ease-out);
+	}
+
+	@media (hover: hover) {
+		.row a:hover .row-arrow {
+			opacity: 1;
+			transform: none;
+			color: var(--accent-deep);
+		}
+	}
+
+	@media (max-width: 640px) {
+		.row a {
+			grid-template-columns: 3.2rem minmax(0, 1fr);
+			row-gap: 0.2rem;
+		}
+		.row-title { white-space: normal; }
+		.row-cat { grid-column: 2; }
+		.row-arrow { display: none; }
+	}
+</style>
+
+<script>
+	// 筛选：读 URL 参数，隐藏不匹配的条目并更新年份计数。
+	// 数据构建期已全部就绪，这里只做显隐，不重新取数。
+	const params = new URLSearchParams(location.search);
+	const tag = params.get("tag");
+	const category = params.get("category");
+	const uncategorized = params.get("uncategorized") === "true";
+
+	const bar = document.getElementById("filter-bar");
+	const value = document.getElementById("filter-value");
+	const empty = document.getElementById("empty");
+
+	if (tag || category || uncategorized) {
+		let shown = 0;
+
+		for (const group of document.querySelectorAll<HTMLElement>(".year-group")) {
+			let visible = 0;
+			for (const row of group.querySelectorAll<HTMLElement>(".row")) {
+				const tags: string[] = JSON.parse(row.dataset.tags || "[]");
+				const cat = row.dataset.category || "";
+				const hit = tag
+					? tags.includes(tag)
+					: uncategorized
+						? cat === ""
+						: cat === category;
+				row.hidden = !hit;
+				if (hit) visible++;
+			}
+			group.hidden = visible === 0;
+			const count = group.querySelector(".year-count");
+			if (count) count.textContent = `${visible} 篇`;
+			shown += visible;
+		}
+
+		if (bar && value) {
+			value.textContent = tag
+				? `#${tag}`
+				: uncategorized
+					? "未分类"
+					: (category ?? "");
+			bar.hidden = false;
+		}
+		if (empty) empty.hidden = shown > 0;
+	}
+</script>
