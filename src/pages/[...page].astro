@@ -1,18 +1,70 @@
 ---
 // ─────────────────────────────────────────────────────────────────────────
-// 概念稿 · 首页 v2
-// v1 把站点改成了黑白编辑部风，等于删掉了这个站最强的三样东西：
-// 插画、浅色薄荷调、浮在壁纸上的白色圆角卡片。
-// v2 保留这套底子，加法做在排版精度、编排层次和动效上。
+// 首页
+// 保留站点原本的底子：插画当主角、浅色薄荷调、白色圆角卡片浮在壁纸上。
+// 加法做在排版精度、编排层次和动效上。
 // ─────────────────────────────────────────────────────────────────────────
+import type { GetStaticPaths } from "astro";
 import { Icon } from "astro-icon/components";
 import LabHead from "@/components/lab/LabHead.astro";
 import { backgroundWallpaper, siteConfig } from "@/config";
 import { getSortedPostsList } from "@/utils/content-utils";
-import { getPostUrlBySlug } from "@/utils/url-utils";
+import { hueFromString, usableImage } from "@/utils/lab-utils";
 import "@/styles/lab.css";
 
-const posts = await getSortedPostsList();
+export const getStaticPaths = (async ({ paginate }) => {
+	const posts = await getSortedPostsList();
+	const items = posts.map((post, index) => ({
+		index,
+		title: post.data.title,
+		postUrl: `/posts/${post.id}/`,
+		category: post.data.category || "未分类",
+		tags: post.data.tags,
+		description: post.data.description,
+		published: post.data.published,
+		image: usableImage(post.data.image),
+		hue: hueFromString(post.data.title),
+	}));
+	return paginate(items, {
+		pageSize: siteConfig.pagination?.postsPerPage ?? 8,
+	});
+}) satisfies GetStaticPaths;
+
+type Item = {
+	index: number;
+	title: string;
+	postUrl: string;
+	category: string;
+	tags: string[];
+	description: string;
+	published: Date;
+	image: string;
+	hue: number;
+};
+
+const { page } = Astro.props as {
+	page: {
+		data: Item[];
+		currentPage: number;
+		lastPage: number;
+		url: { prev?: string; next?: string };
+	};
+};
+
+const isFirstPage = page.currentPage === 1;
+
+// 搜索要跨全部文章，不能只认当前这一页，所以另外备一份完整索引。
+// 十几到几百篇的量级，内联进页面比再发一次请求划算。
+const allPosts = await getSortedPostsList();
+const searchIndex = allPosts.map((post) => ({
+	t: post.data.title,
+	g: post.data.tags,
+	c: post.data.category || "未分类",
+	u: `/posts/${post.id}/`,
+	d: post.data.published.toISOString().slice(0, 10),
+	i: usableImage(post.data.image),
+	h: hueFromString(post.data.title),
+}));
 
 const homeText = backgroundWallpaper.common?.homeText;
 const displayTitle = homeText?.title || siteConfig.title || "KK";
@@ -28,49 +80,23 @@ const titleTokens = displayTitle
 	.map((word) => [...word]);
 let charCursor = 0;
 
-/** 壁纸可能是字符串、数组，或 { desktop, mobile, playerUrl } */
-function pickWallpaper(): string {
+/** 壁纸配置可能是字符串、数组，或 { desktop, mobile, playerUrl } */
+function pickWallpaper(kind: "desktop" | "mobile"): string {
 	const src = backgroundWallpaper.src;
 	if (!src) return "";
 	const first = (v: string | string[] | undefined): string =>
 		Array.isArray(v) ? (v[0] ?? "") : (v ?? "");
 	if (typeof src === "string") return src;
 	if (Array.isArray(src)) return first(src);
-	return first(src.desktop);
+	return first(src[kind]) || first(src.desktop);
 }
-const wallpaper = pickWallpaper();
+// 手机上用竖版壁纸：横版图在窄高视口里被 cover 裁掉大半，人物基本看不见
+const wallpaperDesktop = pickWallpaper("desktop");
+const wallpaperMobile = pickWallpaper("mobile");
 
-function hueFromString(value: string): number {
-	let hash = 0;
-	for (let i = 0; i < value.length; i++) {
-		hash = (hash << 5) - hash + value.charCodeAt(i);
-		hash |= 0;
-	}
-	return Math.abs(hash) % 360;
-}
-
-function usableImage(src: string): string {
-	if (!src) return "";
-	if (src.startsWith("http://") || src.startsWith("https://")) return src;
-	if (src.startsWith("/")) return src;
-	return "";
-}
-
-const items = posts.map((post, index) => ({
-	index,
-	title: post.data.title,
-	postUrl: `/posts/${post.id}/`,
-	realUrl: getPostUrlBySlug(post.id),
-	category: post.data.category || "未分类",
-	tags: post.data.tags.slice(0, 4),
-	description: post.data.description,
-	published: post.data.published,
-	image: usableImage(post.data.image),
-	hue: hueFromString(post.data.title),
-}));
-
-// 第一篇做特稿位，其余走紧凑列
-const [feature, ...rest] = items;
+// 首页第一页才给特稿位；翻页之后统一走网格
+const feature = isFirstPage ? page.data[0] : undefined;
+const rest = isFirstPage ? page.data.slice(1) : page.data;
 
 const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
 	year: "numeric",
@@ -82,12 +108,33 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
 <html lang="zh-CN">
 	<head>
 		<LabHead />
-		{wallpaper && <link rel="preload" as="image" href={wallpaper} fetchpriority="high" />}
+		{wallpaperDesktop && (
+			<link
+				rel="preload"
+				as="image"
+				href={wallpaperDesktop}
+				media="(min-width: 769px)"
+				fetchpriority="high"
+			/>
+		)}
+		{wallpaperMobile && (
+			<link
+				rel="preload"
+				as="image"
+				href={wallpaperMobile}
+				media="(max-width: 768px)"
+				fetchpriority="high"
+			/>
+		)}
 	</head>
 
 	<body>
 		<!-- 壁纸固定在最底层，内容区半透明浮在上面 —— 和现有主题的 overlay 模式同源 -->
-		<div class="wallpaper" style={`--wallpaper:url("${wallpaper}")`} aria-hidden="true"></div>
+		<div
+			class="wallpaper"
+			style={`--wp-desktop:url("${wallpaperDesktop}"); --wp-mobile:url("${wallpaperMobile || wallpaperDesktop}")`}
+			aria-hidden="true"
+		></div>
 
 		<header class="hero">
 			<div class="hero-bar">
@@ -129,7 +176,7 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
 			</div>
 
 			<div class="hero-foot">
-				<span class="micro hero-count">{String(items.length).padStart(3, "0")} 篇文章</span>
+				<span class="micro hero-count">{String(allPosts.length).padStart(3, "0")} 篇文章</span>
 				<a href="#index" class="scroll-cue" aria-label="向下滚动">
 					<span class="micro">向下滚动</span>
 					<Icon is:inline name="lucide:arrow-down" />
@@ -141,9 +188,28 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
 			<div class="sheet-inner">
 				<div class="sheet-head">
 					<h2 class="sheet-title">文章</h2>
-					<span class="micro">Index</span>
+					<div class="search" role="search">
+						<Icon is:inline name="lucide:search" class="search-icon" />
+						<input
+							id="search-input"
+							type="search"
+							placeholder="搜索标题或标签…"
+							autocomplete="off"
+							aria-label="搜索文章"
+						/>
+						<button id="search-clear" type="button" aria-label="清空搜索" hidden>
+							<Icon is:inline name="lucide:x" />
+						</button>
+					</div>
 				</div>
 
+				<!-- 搜索结果：有输入时顶掉下面的分页网格 -->
+				<div id="search-results" hidden>
+					<p class="search-summary micro" id="search-summary"></p>
+					<div class="grid" id="search-grid"></div>
+				</div>
+
+				<div id="browse">
 				{
 					feature && (
 						<a class="feature card" href={feature.postUrl} data-reveal>
@@ -207,6 +273,41 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
 						))
 					}
 				</div>
+
+				{
+					page.lastPage > 1 && (
+						<nav class="pager" aria-label="分页">
+							{page.url.prev ? (
+								<a href={page.url.prev} class="pager-btn" rel="prev">
+									<Icon is:inline name="lucide:arrow-left" />
+									<span>上一页</span>
+								</a>
+							) : (
+								<span class="pager-btn is-disabled" aria-hidden="true">
+									<Icon is:inline name="lucide:arrow-left" />
+									<span>上一页</span>
+								</span>
+							)}
+
+							<span class="pager-now micro">
+								{String(page.currentPage).padStart(2, "0")} / {String(page.lastPage).padStart(2, "0")}
+							</span>
+
+							{page.url.next ? (
+								<a href={page.url.next} class="pager-btn" rel="next">
+									<span>下一页</span>
+									<Icon is:inline name="lucide:arrow-right" />
+								</a>
+							) : (
+								<span class="pager-btn is-disabled" aria-hidden="true">
+									<span>下一页</span>
+									<Icon is:inline name="lucide:arrow-right" />
+								</span>
+							)}
+						</nav>
+					)
+				}
+				</div>
 			</div>
 		</main>
 
@@ -226,9 +327,18 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
 				position: fixed;
 				inset: 0;
 				z-index: -1;
-				background-image: var(--wallpaper);
+				background-image: var(--wp-desktop);
 				background-size: cover;
 				background-position: center 20%;
+			}
+
+			/* 手机上换竖版壁纸。横版图放进窄高视口，cover 会把左右裁掉大半，
+			   人物基本只剩一角 */
+			@media (max-width: 768px) {
+				.wallpaper {
+					background-image: var(--wp-mobile);
+					background-position: center top;
+				}
 			}
 
 			/* 注意：底纹不能挂在这个固定层上。挂在这里的话渐变是相对视口的，
@@ -273,7 +383,18 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
 				display: flex;
 				align-items: center;
 				gap: 0.4rem;
-				flex-wrap: wrap;
+				min-width: 0;
+			}
+
+			/* 窄屏让导航横向滚动，而不是折成两排把整个 hero-bar 撑高 */
+			@media (max-width: 640px) {
+				.hero-nav {
+					overflow-x: auto;
+					scrollbar-width: none;
+					-webkit-overflow-scrolling: touch;
+				}
+				.hero-nav::-webkit-scrollbar { display: none; }
+				.hero-nav > * { flex-shrink: 0; }
 			}
 
 			.hero-nav a {
@@ -385,6 +506,8 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
 			/* ── 内容区 ─────────────────────────────────────────── */
 			.sheet {
 				position: relative;
+				/* 文章不足一屏时，底色要一直铺到页脚，不能让固定壁纸从中间透出来 */
+				min-height: 60vh;
 				padding: 0 var(--gutter) clamp(3rem, 8vw, 6rem);
 				/* 顶部一段渐变把插画收进纸色，往下彻底交给纸色；
 				   随内容滚动，卡片区域始终有稳定的依托 */
@@ -403,11 +526,114 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
 
 			.sheet-head {
 				display: flex;
-				align-items: baseline;
+				align-items: center;
 				justify-content: space-between;
+				flex-wrap: wrap;
 				gap: 1rem;
 				margin-bottom: 1.5rem;
 			}
+
+			.search {
+				position: relative;
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				min-width: min(100%, 18rem);
+				padding: 0.5rem 0.9rem;
+				border-radius: 999px;
+				background: var(--card);
+				box-shadow: var(--lift-1);
+				transition: box-shadow 0.3s var(--ease-out);
+			}
+
+			.search:focus-within { box-shadow: var(--lift-2); }
+
+			.search-icon { color: var(--ink-mute); flex-shrink: 0; }
+
+			.search input {
+				flex: 1;
+				min-width: 0;
+				border: 0;
+				background: none;
+				color: var(--ink);
+				font-family: inherit;
+				font-size: 0.9rem;
+				outline: none;
+			}
+
+			.search input::placeholder { color: var(--ink-mute); }
+
+			/* 去掉 Safari/Chrome 给 type=search 加的原生清除按钮，用自己的 */
+			.search input::-webkit-search-cancel-button { display: none; }
+
+			/* [hidden] 的 display:none 来自 UA 样式，会被这里的 display:grid 盖掉，
+			   得显式让它失效 */
+			.search button[hidden] { display: none; }
+
+			.search button {
+				display: grid;
+				place-items: center;
+				width: 1.4rem;
+				height: 1.4rem;
+				border: 0;
+				border-radius: 50%;
+				background: var(--accent-wash);
+				color: var(--accent-deep);
+				cursor: pointer;
+				font-size: 0.8rem;
+			}
+
+			.search-summary {
+				margin: 0 0 1.25rem;
+			}
+
+			.search-empty {
+				padding: 3rem 1rem;
+				text-align: center;
+				color: var(--ink-soft);
+			}
+
+			/* ── 分页 ───────────────────────────────────────────── */
+			.pager {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 1rem;
+				margin-top: clamp(2rem, 5vw, 3rem);
+			}
+
+			.pager-btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5rem;
+				padding: 0.6rem 1.1rem;
+				border-radius: 999px;
+				background: var(--card);
+				box-shadow: var(--lift-1);
+				color: var(--ink);
+				font-size: 0.85rem;
+				text-decoration: none;
+				transition:
+					transform 0.4s var(--spring),
+					box-shadow 0.4s var(--ease-out),
+					background-color 0.3s var(--ease-out),
+					color 0.3s var(--ease-out);
+			}
+
+			.pager-btn:hover:not(.is-disabled) {
+				background: var(--accent);
+				color: #fff;
+				transform: translateY(-2px);
+				box-shadow: var(--lift-2);
+			}
+
+			.pager-btn.is-disabled {
+				opacity: 0.4;
+				box-shadow: none;
+				pointer-events: none;
+			}
+
+			.pager-now { font-variant-numeric: tabular-nums; }
 
 			.sheet-title {
 				margin: 0;
@@ -494,133 +720,7 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
 
 			.feature-go :global(svg) { transition: transform 0.5s var(--spring); }
 
-			/* ── 网格 ───────────────────────────────────────────── */
-			.grid {
-				display: grid;
-				grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
-				gap: 1.25rem;
-			}
-
-			.tile {
-				display: flex;
-				flex-direction: column;
-				overflow: hidden;
-				color: inherit;
-				text-decoration: none;
-			}
-
-			.tile-art {
-				position: relative;
-				aspect-ratio: 16 / 10;
-				background-size: cover;
-				background-position: center;
-				transition: transform 0.9s var(--ease-out);
-			}
-
-			/* 编号压在图上，是 v1 那套索引编排里唯一值得留下的东西 */
-			.tile-num {
-				position: absolute;
-				left: 0.75rem;
-				bottom: 0.75rem;
-				padding: 0.25rem 0.55rem;
-				border-radius: 999px;
-				background: rgb(255 255 255 / 0.86);
-				backdrop-filter: blur(8px);
-				color: var(--ink);
-				letter-spacing: 0.1em;
-			}
-
-			/* 文字型卡片：用一条强调色顶边 + 大号编号占位，
-			   视觉重量和图片卡持平，但气质完全不同 */
-			.tile-plate {
-				display: flex;
-				align-items: flex-end;
-				padding: 1rem 1.1rem 0;
-				border-top: 3px solid var(--accent);
-				background: linear-gradient(
-					to bottom,
-					var(--accent-wash),
-					transparent
-				);
-			}
-
-			.tile-num-plain {
-				font-family: var(--mono);
-				font-size: 2.1rem;
-				font-weight: 500;
-				line-height: 1;
-				letter-spacing: -0.02em;
-				color: var(--accent-deep);
-				opacity: 0.75;
-			}
-
-			.tile-desc {
-				margin: 0;
-				font-size: 0.84rem;
-				line-height: 1.7;
-				color: var(--ink-soft);
-				text-wrap: pretty;
-				display: -webkit-box;
-				-webkit-box-orient: vertical;
-				-webkit-line-clamp: 3;
-				overflow: hidden;
-			}
-
-			.tile-body {
-				display: flex;
-				flex-direction: column;
-				gap: 0.5rem;
-				flex: 1;
-				padding: 1rem 1.1rem 1.1rem;
-			}
-
-			.tile-cat { color: var(--accent-deep); }
-
-			.tile-title {
-				margin: 0;
-				font-size: 1.05rem;
-				font-weight: 650;
-				line-height: 1.35;
-				letter-spacing: -0.015em;
-				text-wrap: pretty;
-				display: -webkit-box;
-				-webkit-box-orient: vertical;
-				-webkit-line-clamp: 3;
-				overflow: hidden;
-			}
-
-			.tile-foot {
-				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				gap: 0.75rem;
-				margin-top: auto;
-				padding-top: 0.75rem;
-				border-top: 1px solid var(--hair);
-			}
-
-			.tile-arrow {
-				font-size: 0.95rem;
-				color: var(--accent-deep);
-				opacity: 0;
-				transform: translate3d(-0.3rem, 0.3rem, 0);
-				transition:
-					opacity 0.4s var(--ease-out),
-					transform 0.5s var(--spring);
-			}
-
 			/* ── 悬停 ───────────────────────────────────────────── */
-			@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-				.feature:hover,
-				.tile:hover {
-					transform: translateY(-4px);
-					box-shadow: var(--lift-3);
-				}
-				.feature:hover .feature-art,
-				.tile:hover .tile-art { transform: scale(1.045); }
-				.feature:hover .feature-go :global(svg) { transform: translateX(0.3rem); }
-				.tile:hover .tile-arrow { opacity: 1; transform: none; }
-			}
 
 			/* ── 滚动进场 ───────────────────────────────────────── */
 			@media (prefers-reduced-motion: no-preference) {
@@ -637,8 +737,11 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
 
 			/* ── 页脚 ───────────────────────────────────────────── */
 			.footer {
+				position: relative;
 				padding: 2rem var(--gutter) 2.5rem;
 				border-top: 1px solid var(--hair);
+				/* 壁纸是 fixed 的，页脚不铺底色的话插画会从背后透上来 */
+				background: var(--ground);
 			}
 
 			.footer-inner {
@@ -675,6 +778,125 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
 				.scroll-cue { justify-content: center; }
 			}
 		</style>
+
+		<!-- 搜索索引：跨全部文章，不受当前分页限制 -->
+		<script id="search-index" type="application/json" set:html={JSON.stringify(searchIndex)} is:inline />
+
+		<script>
+			// ── 标题 / 标签 搜索 ──────────────────────────────────
+			// 纯前端过滤：索引已随页面内联，输入即出结果，不发请求。
+			type Entry = {
+				t: string; // 标题
+				g: string[]; // 标签
+				c: string; // 分类
+				u: string; // 链接
+				d: string; // 日期
+				i: string; // 封面
+				h: number; // 派生色相
+			};
+
+			const indexEl = document.getElementById("search-index");
+			const entries: Entry[] = indexEl ? JSON.parse(indexEl.textContent || "[]") : [];
+
+			const input = document.getElementById("search-input") as HTMLInputElement | null;
+			const clearBtn = document.getElementById("search-clear") as HTMLButtonElement | null;
+			const browse = document.getElementById("browse");
+			const results = document.getElementById("search-results");
+			const grid = document.getElementById("search-grid");
+			const summary = document.getElementById("search-summary");
+
+			function escapeHtml(v: string): string {
+				return v.replace(/[&<>"']/g, (c) => ({
+					"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+				})[c] as string);
+			}
+
+			function tileHtml(e: Entry, n: number): string {
+				const art = e.i
+					? `<div class="tile-art" style="background-image:url('${escapeHtml(e.i)}')">
+							<span class="tile-num micro">${String(n).padStart(2, "0")}</span>
+						</div>`
+					: `<div class="tile-plate">
+							<span class="tile-num-plain">${String(n).padStart(2, "0")}</span>
+						</div>`;
+				return `<a class="tile card ${e.i ? "has-art" : "no-art"}" href="${escapeHtml(e.u)}">
+					${art}
+					<div class="tile-body">
+						<span class="micro tile-cat">${escapeHtml(e.c)}</span>
+						<h3 class="tile-title">${escapeHtml(e.t)}</h3>
+						<div class="tile-foot micro">
+							<span>${escapeHtml(e.d.replace(/-/g, "/"))}</span>
+						</div>
+					</div>
+				</a>`;
+			}
+
+			function run(raw: string): void {
+				const q = raw.trim().toLowerCase();
+				if (!clearBtn || !browse || !results || !grid || !summary) return;
+
+				clearBtn.hidden = q.length === 0;
+
+				if (!q) {
+					results.hidden = true;
+					browse.hidden = false;
+					return;
+				}
+
+				// 空格分词，每个词都要命中（标题或任一标签或分类）
+				const terms = q.split(/\s+/).filter(Boolean);
+				const hits = entries.filter((e) => {
+					const hay = `${e.t} ${e.g.join(" ")} ${e.c}`.toLowerCase();
+					return terms.every((term) => hay.includes(term));
+				});
+
+				browse.hidden = true;
+				results.hidden = false;
+				summary.textContent = `“${raw.trim()}” — ${hits.length} 篇`;
+				grid.innerHTML = hits.length
+					? hits.map((e, i) => tileHtml(e, i + 1)).join("")
+					: `<p class="search-empty">没有匹配的文章</p>`;
+			}
+
+			// 支持 ?q= 直接进入搜索状态，搜索结果因此可以分享
+			const initialQuery = new URLSearchParams(location.search).get("q") ?? "";
+			if (initialQuery && input) {
+				input.value = initialQuery;
+				run(initialQuery);
+			}
+
+			let debounce: number | undefined;
+			function syncUrl(q: string): void {
+				const url = new URL(location.href);
+				if (q.trim()) url.searchParams.set("q", q.trim());
+				else url.searchParams.delete("q");
+				history.replaceState(null, "", url);
+			}
+
+			input?.addEventListener("input", () => {
+				window.clearTimeout(debounce);
+				debounce = window.setTimeout(() => {
+					run(input.value);
+					syncUrl(input.value);
+				}, 120);
+			});
+
+			input?.addEventListener("keydown", (e) => {
+				if (e.key === "Escape" && input.value) {
+					input.value = "";
+					run("");
+					syncUrl("");
+				}
+			});
+
+			clearBtn?.addEventListener("click", () => {
+				if (!input) return;
+				input.value = "";
+				run("");
+				syncUrl("");
+				input.focus();
+			});
+		</script>
 
 		<script>
 			// 滚动进场：同一批进入视口的卡片依次亮相，批次之间重新计数，

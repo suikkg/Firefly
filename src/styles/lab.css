@@ -172,3 +172,139 @@ body {
 		scroll-behavior: auto !important;
 	}
 }
+
+
+/* ==========================================================================
+   文章卡片与网格
+   --------------------------------------------------------------------------
+   放在全局而不是页面 scoped：搜索结果的卡片由 JS 生成，拿不到 Astro 的
+   scope 属性，规则写在页面 <style> 里会让搜出来的卡片变成一堆带下划线的
+   裸链接。
+   ========================================================================== */
+
+/* ── 网格 ───────────────────────────────────────────── */
+.grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+	gap: 1.25rem;
+}
+
+.tile {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	color: inherit;
+	text-decoration: none;
+}
+
+.tile-art {
+	position: relative;
+	aspect-ratio: 16 / 10;
+	background-size: cover;
+	background-position: center;
+	transition: transform 0.9s var(--ease-out);
+}
+
+/* 编号压在图上，是 v1 那套索引编排里唯一值得留下的东西 */
+.tile-num {
+	position: absolute;
+	left: 0.75rem;
+	bottom: 0.75rem;
+	padding: 0.25rem 0.55rem;
+	border-radius: 999px;
+	background: rgb(255 255 255 / 0.86);
+	backdrop-filter: blur(8px);
+	color: var(--ink);
+	letter-spacing: 0.1em;
+}
+
+/* 文字型卡片：用一条强调色顶边 + 大号编号占位，
+   视觉重量和图片卡持平，但气质完全不同 */
+.tile-plate {
+	display: flex;
+	align-items: flex-end;
+	padding: 1rem 1.1rem 0;
+	border-top: 3px solid var(--accent);
+	background: linear-gradient(
+		to bottom,
+		var(--accent-wash),
+		transparent
+	);
+}
+
+.tile-num-plain {
+	font-family: var(--mono);
+	font-size: 2.1rem;
+	font-weight: 500;
+	line-height: 1;
+	letter-spacing: -0.02em;
+	color: var(--accent-deep);
+	opacity: 0.75;
+}
+
+.tile-desc {
+	margin: 0;
+	font-size: 0.84rem;
+	line-height: 1.7;
+	color: var(--ink-soft);
+	text-wrap: pretty;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	overflow: hidden;
+}
+
+.tile-body {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	flex: 1;
+	padding: 1rem 1.1rem 1.1rem;
+}
+
+.tile-cat { color: var(--accent-deep); }
+
+.tile-title {
+	margin: 0;
+	font-size: 1.05rem;
+	font-weight: 650;
+	line-height: 1.35;
+	letter-spacing: -0.015em;
+	text-wrap: pretty;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	overflow: hidden;
+}
+
+.tile-foot {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-top: auto;
+	padding-top: 0.75rem;
+	border-top: 1px solid var(--hair);
+}
+
+.tile-arrow {
+	font-size: 0.95rem;
+	color: var(--accent-deep);
+	opacity: 0;
+	transform: translate3d(-0.3rem, 0.3rem, 0);
+	transition:
+		opacity 0.4s var(--ease-out),
+		transform 0.5s var(--spring);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+	.feature:hover,
+	.tile:hover {
+		transform: translateY(-4px);
+		box-shadow: var(--lift-3);
+	}
+	.feature:hover .feature-art,
+	.tile:hover .tile-art { transform: scale(1.045); }
+	.feature:hover .feature-go :global(svg) { transform: translateX(0.3rem); }
+	.tile:hover .tile-arrow { opacity: 1; transform: none; }
+}
