@@ -15,9 +15,36 @@ const config = {
 };
 ---
 <!-- Waline -->
+<!-- 评论区在页面很靠下的位置，但它的第三方样式表原本是阻塞渲染的：
+     浏览器必须先跟 unpkg 建连、下载完 CSS 才肯绘制首屏。
+     这里先 preconnect 省掉握手往返，再用 media="print" 把样式表降级成非阻塞加载，
+     onload 后切回 all 生效；禁用 JS 时由 noscript 里的普通 link 兜底。 -->
+<link rel="preconnect" href="https://unpkg.com" crossorigin />
+<link rel="dns-prefetch" href="https://unpkg.com" />
+
 <div class="relative w-full">
   <div id="waline"></div>
-  <link rel="stylesheet" href="https://unpkg.com/@waline/client@v3/dist/waline.css" />
+  <link
+    id="waline-style"
+    rel="stylesheet"
+    href="https://unpkg.com/@waline/client@v3/dist/waline.css"
+    media="print"
+  />
+  <noscript>
+    <link rel="stylesheet" href="https://unpkg.com/@waline/client@v3/dist/waline.css" />
+  </noscript>
+  <script is:inline>
+    (function () {
+      var link = document.getElementById("waline-style");
+      if (!link) return;
+      var apply = function () {
+        link.media = "all";
+      };
+      // 命中缓存时 load 可能已经过去了，用 sheet 是否可读来兜一手
+      if (link.sheet) apply();
+      else link.addEventListener("load", apply, { once: true });
+    })();
+  </script>
   <script type="module" is:inline define:vars={{ config }}>
     import { init } from 'https://unpkg.com/@waline/client@v3/dist/waline.js';
     const requestedPath = new URLSearchParams(window.location.search).get("path");

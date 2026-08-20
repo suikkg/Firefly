@@ -16,7 +16,8 @@
     "format": "biome format --write ./src",
     "lint": "biome check --write ./src",
     "preinstall": "npx only-allow pnpm",
-    "lqips": "npx tsx scripts/generate-lqips.ts"
+    "lqips": "npx tsx scripts/generate-lqips.ts",
+    "icons": "npx tsx scripts/generate-icons-data.ts"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.9",
@@ -30,11 +31,7 @@
     "@expressive-code/plugin-collapsible-sections": "^0.44.1",
     "@expressive-code/plugin-line-numbers": "^0.44.1",
     "@fancyapps/ui": "^6.1.14",
-    "@iconify-json/fa7-brands": "^1.2.4",
-    "@iconify-json/fa7-regular": "^1.2.3",
-    "@iconify-json/fa7-solid": "^1.2.5",
-    "@iconify-json/material-symbols": "^1.2.87",
-    "@iconify-json/mingcute": "^1.2.7",
+    "@iconify-json/lucide": "^1.2.124",
     "@iconify-json/simple-icons": "^1.2.91",
     "@iconify/svelte": "^5.2.2",
     "@iconify/types": "^2.0.0",
@@ -88,8 +85,6 @@
   "devDependencies": {
     "@astrojs/ts-plugin": "^1.10.10",
     "@biomejs/biome": "2.5.5",
-    "@iconify-json/mdi": "^1.2.3",
-    "@iconify-json/svg-spinners": "^1.2.4",
     "@tailwindcss/vite": "^4.3.3",
     "@types/qrcode": "^1.5.6",
     "@types/sanitize-html": "^2.16.1",

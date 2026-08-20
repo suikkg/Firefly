@@ -10,6 +10,7 @@
 @import './tags.css';
 @import './display-settings.css';
 @import './categories.css';
+@import './design-system.css';
 
 @plugin '@tailwindcss/typography';
 
@@ -51,6 +52,12 @@
 /* 确保平滑滚动 */
 html {
     scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
 }
 
 /* 页面顶部渐变高光效果 */
@@ -304,8 +311,8 @@ html {
     }
 
     .btn-card {
-        @apply transition-colors duration-150 flex items-center justify-center bg-(--card-bg) hover:bg-(--btn-card-bg-hover)
-        active:bg-(--btn-card-bg-active)
+        @apply transition duration-150 flex items-center justify-center bg-(--card-bg) hover:bg-(--btn-card-bg-hover)
+        active:bg-(--btn-card-bg-active) active:scale-[0.97]
     }
     .btn-card.disabled {
         @apply pointer-events-none text-black/10 dark:text-white/10
@@ -324,7 +331,7 @@ html {
         @apply bg-(--btn-plain-bg-hover) text-(--primary);
     }
     .btn-regular {
-        @apply transition-colors duration-150 flex items-center justify-center bg-(--btn-regular-bg) hover:bg-(--btn-regular-bg-hover) active:bg-(--btn-regular-bg-active)
+        @apply transition duration-150 flex items-center justify-center bg-(--btn-regular-bg) hover:bg-(--btn-regular-bg-hover) active:bg-(--btn-regular-bg-active) active:scale-[0.97]
         text-(--btn-content) dark:text-white/75
     }
 

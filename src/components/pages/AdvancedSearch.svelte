@@ -116,7 +116,7 @@ const handleInput = () => {
     <div class="mb-4">
         <div class="flex items-center gap-3 mb-3">
             <div class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70">
-                <Icon icon="material-symbols:search" class="text-[1.5rem]"></Icon>
+                <Icon icon="lucide:search" class="text-[1.5rem]"></Icon>
             </div>
             <div class="text-3xl font-bold text-90">
                 {title}
@@ -133,7 +133,7 @@ const handleInput = () => {
     <div class="relative flex">
         <div class="relative flex-1">
             <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <Icon icon="material-symbols:search" class="text-2xl text-50" />
+                <Icon icon="lucide:search" class="text-2xl text-50" />
             </div>
             <input
                 type="text"
@@ -151,7 +151,7 @@ const handleInput = () => {
     <div>
         {#if isSearching}
             <div class="flex justify-center py-10">
-                <Icon icon="svg-spinners:ring-resize" class="text-4xl text-(--primary)" />
+                <Icon icon="lucide:loader-circle" class="text-4xl text-(--primary) animate-spin motion-reduce:animate-none" />
             </div>
         {:else if results.length > 0}
             <div class="space-y-4">

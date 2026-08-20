@@ -1,0 +1,105 @@
+---
+// 新版页面的 <head>
+// 概念稿阶段这里只有一个 title 加 noindex，那是预览用的。
+// 一旦新版成为站点默认门面，缺失的 canonical / OG / RSS / favicon
+// 会直接让首页和全部文章从搜索引擎消失、分享预览全部失效，
+// 所以这些必须补齐，并且不能再带 noindex。
+import { profileConfig, siteConfig } from "@/config";
+import { defaultFavicons } from "@/constants/icon";
+import type { Favicon } from "@/types/config";
+import { url } from "@/utils/url-utils";
+
+interface Props {
+	/** 页面标题；不传则用站点标题 + 副标题 */
+	title?: string;
+	description?: string;
+	/** 文章页传 slug，用于取构建期生成的 OG 图 */
+	postSlug?: string;
+	/** 文章页为 article，其余为 website */
+	ogType?: "website" | "article";
+	/** 旧版入口这类重复内容页面传 true */
+	noindex?: boolean;
+}
+
+const {
+	title,
+	description = siteConfig.description,
+	postSlug,
+	ogType = "website",
+	noindex = false,
+} = Astro.props;
+
+const pageTitle = title
+	? `${title} - ${siteConfig.title}`
+	: siteConfig.subtitle
+		? `${siteConfig.title} - ${siteConfig.subtitle}`
+		: siteConfig.title;
+
+const canonical = new URL(Astro.url.pathname, Astro.site).toString();
+const ogImageUrl = postSlug
+	? new URL(`/og/${postSlug}.png`, Astro.site).toString()
+	: undefined;
+
+const favicons: Favicon[] =
+	siteConfig.favicon.length > 0 ? siteConfig.favicon : defaultFavicons;
+
+// expressive-code 靠 data-theme 选配色（useDarkModeMediaQuery 关着），
+// 不设这个属性，代码块会退回 themes 数组的第一个（深色主题）
+const EC_LIGHT = "one-light";
+const EC_DARK = "one-dark-pro";
+---
+
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="generator" content={Astro.generator} />
+
+<title>{pageTitle}</title>
+<meta name="description" content={description} />
+{siteConfig.keywords && siteConfig.keywords.length > 0 && (
+	<meta name="keywords" content={siteConfig.keywords.join(", ")} />
+)}
+<meta name="author" content={profileConfig.name} />
+{noindex && <meta name="robots" content="noindex, follow" />}
+
+<link rel="canonical" href={canonical} />
+
+<meta property="og:site_name" content={siteConfig.title} />
+<meta property="og:url" content={canonical} />
+<meta property="og:title" content={pageTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:type" content={ogType} />
+{ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
+
+<meta name="twitter:card" content={ogImageUrl ? "summary_large_image" : "summary"} />
+<meta property="twitter:url" content={canonical} />
+<meta name="twitter:title" content={pageTitle} />
+<meta name="twitter:description" content={description} />
+
+{
+	favicons.map((favicon) => (
+		<link
+			rel="icon"
+			href={favicon.src.startsWith("/") ? url(favicon.src) : favicon.src}
+			sizes={favicon.sizes}
+			media={favicon.theme && `(prefers-color-scheme: ${favicon.theme})`}
+		/>
+	))
+}
+
+<link
+	rel="alternate"
+	type="application/rss+xml"
+	title={siteConfig.title}
+	href={new URL("rss.xml", Astro.site)}
+/>
+
+<script is:inline define:vars={{ ecLight: EC_LIGHT, ecDark: EC_DARK }}>
+	(function () {
+		try {
+			var stored = localStorage.getItem("theme");
+			var dark = stored ? stored === "dark" : false;
+			document.documentElement.classList.toggle("dark", dark);
+			document.documentElement.setAttribute("data-theme", dark ? ecDark : ecLight);
+		} catch (e) {}
+	})();
+</script>

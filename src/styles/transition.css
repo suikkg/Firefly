@@ -76,7 +76,7 @@ html.is-animating .transition-swup-fade {
 
 .onload-animation {
     opacity: 0;
-    animation: fade-in-up 120ms ease-out forwards;
+    animation: fade-in-up 180ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
 /* 渐进式动画延迟 */
@@ -85,6 +85,19 @@ html.is-animating .transition-swup-fade {
 .onload-animation:nth-child(3) { animation-delay: 60ms; }
 .onload-animation:nth-child(4) { animation-delay: 90ms; }
 .onload-animation:nth-child(5) { animation-delay: 120ms; }
+
+/* 尊重用户的减少动态效果偏好 */
+@media (prefers-reduced-motion: reduce) {
+    .onload-animation {
+        animation: none;
+        opacity: 1;
+    }
+
+    html.is-changing .transition-main,
+    html.is-changing .transition-swup-fade {
+        transition: none;
+    }
+}
 
 /* --------------------------------------------------------------------------
    4. Navigation Progress Bar

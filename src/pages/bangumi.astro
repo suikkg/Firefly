@@ -76,7 +76,7 @@ async function fetchBangumiData(username: string, subjectType: number) {
 	const maxPages = isDev ? 1 : 0; // 0 表示不限制
 
 	console.log(
-		`[Bangumi] ${isDev ? "🔧 开发模式" : "🌐 生产模式"} - 开始获取用户 ${username} 的 subjectType ${subjectType} 数据...`,
+		`[Bangumi] ${isDev ? "开发模式" : "生产模式"} - 开始获取用户 ${username} 的 subjectType ${subjectType} 数据...`,
 	);
 
 	while (hasMore) {
@@ -146,9 +146,9 @@ const isUserIdConfigured =
 	bangumiConfig.username.trim() !== "";
 
 if (!isUserIdConfigured) {
-	console.log("[Bangumi] ⚠️ 未配置 Bangumi 用户ID，跳过数据获取");
+	console.log("[Bangumi] 未配置 Bangumi 用户ID，跳过数据获取");
 } else if (!isDynamic) {
-	console.log("[Bangumi] 🌐 从 API 获取数据（static 模式）");
+	console.log("[Bangumi] 从 API 获取数据（static 模式）");
 }
 
 if (!isDynamic) {
@@ -211,7 +211,7 @@ const activeTab = tabs[0]?.id || "anime";
             <div class="mb-6">
                 <div class="flex items-center gap-3 mb-3">
                     <div class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70">
-                        <Icon is:inline name="material-symbols:movie" class="text-[1.5rem]"></Icon>
+                        <Icon is:inline name="lucide:film" class="text-[1.5rem]"></Icon>
                     </div>
                     <div class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">
                         {i18n(I18nKey.bangumi)}
@@ -233,7 +233,7 @@ const activeTab = tabs[0]?.id || "anime";
           {!isUserIdConfigured ? (
             <div class="text-center py-16">
               <div class="inline-flex items-center justify-center w-16 h-16 bg-(--btn-regular-bg) rounded-full mb-6 border border-(--line-divider)">
-                <Icon is:inline name="material-symbols:settings" class="text-[2rem] text-(--btn-content)" />
+                <Icon is:inline name="lucide:settings" class="text-[2rem] text-(--btn-content)" />
               </div>
               <h2 class="text-xl font-semibold text-black/80 dark:text-white/80 mb-3">
                 未配置 Bangumi 用户ID
@@ -262,7 +262,7 @@ const activeTab = tabs[0]?.id || "anime";
       {fetchFailed ? (
         <div class="text-center py-16">
           <div class="inline-flex items-center justify-center w-16 h-16 bg-(--btn-regular-bg) rounded-full mb-6 border border-(--line-divider)">
-            <Icon is:inline name="material-symbols:error-outline" class="text-[2rem] text-red-500" />
+            <Icon is:inline name="lucide:circle-alert" class="text-[2rem] text-red-500" />
           </div>
           <h2 class="text-xl font-semibold text-black/80 dark:text-white/80 mb-3">
             {i18n(I18nKey.bangumiFetchError)}
@@ -278,7 +278,7 @@ const activeTab = tabs[0]?.id || "anime";
       ) : (
         <div class="text-center py-16">
           <div class="inline-flex items-center justify-center w-16 h-16 bg-(--btn-regular-bg) rounded-full mb-6 border border-(--line-divider)">
-            <Icon is:inline name="material-symbols:settings" class="text-[2rem] text-(--btn-content)" />
+            <Icon is:inline name="lucide:settings" class="text-[2rem] text-(--btn-content)" />
           </div>
           <h2 class="text-xl font-semibold text-black/80 dark:text-white/80 mb-3">
             {isUserIdConfigured ? i18n(I18nKey.bangumiEmpty) : "未配置 Bangumi 用户ID"}

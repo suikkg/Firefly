@@ -1,4 +1,5 @@
 ---
+import lucide from "@iconify-json/lucide/icons.json";
 import WidgetLayout from "@/components/common/WidgetLayout.astro";
 import type { WidgetComponentConfig } from "@/types/config";
 
@@ -15,71 +16,107 @@ const city = widgetConfig?.specificConfig?.weather?.city ?? "";
 const refreshMinutes =
 	widgetConfig?.specificConfig?.weather?.refreshMinutes ?? 30;
 
-// 和风天气 icon 码 → emoji（uapis.cn 接口返回 weather_icon）
-const iconMap: Record<string, string> = {
-	"100": "☀️", // 晴
-	"101": "🌤️", // 多云
-	"102": "🌤️", // 少云
-	"103": "⛅", // 晴间多云
-	"104": "☁️", // 阴
-	"300": "🌦️",
-	"301": "🌦️",
-	"302": "⛈️",
-	"303": "⛈️",
-	"304": "⛈️", // 阵雨/雷阵雨
-	"305": "🌧️",
-	"306": "🌧️",
-	"307": "🌧️",
-	"308": "🌧️",
-	"309": "🌦️", // 雨
-	"310": "🌧️",
-	"311": "🌧️",
-	"312": "🌧️",
-	"313": "🌧️",
-	"314": "🌧️",
-	"315": "🌧️",
-	"316": "🌧️",
-	"317": "🌧️",
-	"318": "🌧️",
-	"399": "🌧️",
-	"400": "🌨️",
-	"401": "🌨️",
-	"402": "❄️",
-	"403": "❄️",
-	"404": "🌨️", // 雪
-	"405": "🌨️",
-	"406": "🌧️",
-	"407": "🌨️",
-	"408": "🌨️",
-	"409": "❄️",
-	"410": "❄️",
-	"411": "❄️",
-	"412": "❄️",
-	"413": "🌧️",
-	"414": "🌨️",
-	"415": "🌨️",
-	"416": "🌧️",
-	"417": "🌧️",
-	"418": "❄️",
-	"499": "🌨️",
-	"500": "🌫️",
-	"501": "🌫️",
-	"502": "😷",
-	"503": "🌪️",
-	"504": "🌫️", // 雾霾沙尘
-	"507": "🌪️",
-	"508": "🌪️",
-	"509": "🌫️",
-	"510": "🌫️",
-	"511": "😷",
-	"512": "😷",
-	"513": "😷",
-	"514": "🌫️",
-	"515": "🌫️",
-	"900": "🥵", // 热
-	"901": "🥶", // 冷
-	"999": "🌡️", // 未知
+// 和风天气 icon 码 → Lucide 图标名（uapis.cn 接口返回 weather_icon）
+const CODE_TO_LUCIDE: Record<string, string> = {
+	"100": "sun", // 晴
+	"101": "cloud-sun", // 多云
+	"102": "cloud-sun", // 少云
+	"103": "cloud-sun", // 晴间多云
+	"104": "cloudy", // 阴
+	"300": "cloud-sun-rain", // 阵雨
+	"301": "cloud-sun-rain", // 强阵雨
+	"302": "cloud-lightning", // 雷阵雨
+	"303": "cloud-lightning", // 强雷阵雨
+	"304": "cloud-hail", // 雷阵雨伴有冰雹
+	"305": "cloud-drizzle", // 小雨
+	"306": "cloud-rain", // 中雨
+	"307": "cloud-rain", // 大雨
+	"308": "cloud-rain-wind", // 极端降雨
+	"309": "cloud-drizzle", // 毛毛雨/细雨
+	"310": "cloud-rain-wind", // 暴雨
+	"311": "cloud-rain-wind", // 大暴雨
+	"312": "cloud-rain-wind", // 特大暴雨
+	"313": "cloud-hail", // 冻雨
+	"314": "cloud-rain", // 小到中雨
+	"315": "cloud-rain", // 中到大雨
+	"316": "cloud-rain-wind", // 大到暴雨
+	"317": "cloud-rain-wind", // 暴雨到大暴雨
+	"318": "cloud-rain-wind", // 大暴雨到特大暴雨
+	"399": "cloud-rain", // 雨
+	"400": "cloud-snow", // 小雪
+	"401": "cloud-snow", // 中雪
+	"402": "snowflake", // 大雪
+	"403": "snowflake", // 暴雪
+	"404": "cloud-hail", // 雨夹雪
+	"405": "cloud-hail", // 雨雪天气
+	"406": "cloud-hail", // 阵雨夹雪
+	"407": "cloud-snow", // 阵雪
+	"408": "cloud-snow", // 小到中雪
+	"409": "cloud-snow", // 中到大雪
+	"410": "snowflake", // 大到暴雪
+	"411": "snowflake", // 暴雪
+	"412": "snowflake", // 大暴雪
+	"413": "cloud-snow", // 阵雪
+	"414": "cloud-snow", // 小雪
+	"415": "cloud-snow", // 中雪
+	"416": "cloud-snow", // 大雪
+	"417": "cloud-snow", // 阵雪
+	"418": "snowflake", // 暴雪
+	"499": "cloud-snow", // 雪
+	"500": "cloud-fog", // 薄雾
+	"501": "cloud-fog", // 雾
+	"502": "haze", // 霾
+	"503": "wind", // 扬沙
+	"504": "haze", // 浮尘
+	"507": "tornado", // 沙尘暴
+	"508": "tornado", // 强沙尘暴
+	"509": "cloud-fog", // 浓雾
+	"510": "cloud-fog", // 强浓雾
+	"511": "haze", // 中度霾
+	"512": "haze", // 重度霾
+	"513": "haze", // 严重霾
+	"514": "cloud-fog", // 大雾
+	"515": "cloud-fog", // 特强浓雾
+	"900": "thermometer-sun", // 热
+	"901": "thermometer-snowflake", // 冷
+	"999": "thermometer", // 未知
 };
+
+const FALLBACK_LUCIDE = "thermometer";
+const ALERT_LUCIDE = "triangle-alert";
+
+type LucideCollection = {
+	icons: Record<string, { body: string }>;
+	aliases?: Record<string, { parent: string }>;
+};
+
+/** 取出 Lucide 图标的 body，顺带解析别名 */
+function lucideBody(name: string): string {
+	const set = lucide as unknown as LucideCollection;
+	const direct = set.icons[name];
+	if (direct) return direct.body;
+	const parent = set.aliases?.[name]?.parent;
+	return parent ? (set.icons[parent]?.body ?? "") : "";
+}
+
+/** 编译成可直接塞进 innerHTML 的内联 SVG，构建期完成，运行时零依赖 */
+function inlineSvg(name: string, extraClass = ""): string {
+	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" class="${extraClass}">${lucideBody(name)}</svg>`;
+}
+
+// 构建期只内联「去重后」的图标（约 20 个），运行时按 码 → 图标名 → SVG 两级查表。
+// 直接把 70 个天气码各存一份 SVG 会让内联脚本膨胀近 6 倍，而该组件在页面上会渲染多次。
+const iconSvgs: Record<string, string> = Object.fromEntries(
+	[...new Set([...Object.values(CODE_TO_LUCIDE), FALLBACK_LUCIDE])].map(
+		(name) => [name, lucideBody(name)],
+	),
+);
+const codeToIcon = CODE_TO_LUCIDE;
+const fallbackIcon = FALLBACK_LUCIDE;
+const alertSvg = inlineSvg(
+	ALERT_LUCIDE,
+	"inline-block shrink-0 translate-y-px",
+);
 ---
 
 <WidgetLayout name="天气" showTitle={showTitle} id="weather-widget" class={className} style={style}>
@@ -88,7 +125,7 @@ const iconMap: Record<string, string> = {
 	</div>
 </WidgetLayout>
 
-<script is:inline data-swup-ignore-script define:vars={{ city, refreshMinutes, iconMap }}>
+<script is:inline data-swup-ignore-script define:vars={{ city, refreshMinutes, iconSvgs, codeToIcon, fallbackIcon, alertSvg }}>
 	(function () {
 		const containers = document.querySelectorAll("#weather-widget-content");
 		if (containers.length === 0) return;
@@ -97,16 +134,26 @@ const iconMap: Record<string, string> = {
 		const CACHE_KEY = "kk-weather-cache";
 		const TTL = Math.max(refreshMinutes, 5) * 60 * 1000; // 最少 5 分钟
 
-		function emoji(icon) {
-			return (iconMap && iconMap[String(icon)]) || "🌡️";
+		function weatherIcon(code) {
+			const name = codeToIcon[String(code)] || fallbackIcon;
+			const body = iconSvgs[name] || iconSvgs[fallbackIcon] || "";
+			return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true">${body}</svg>`;
+		}
+
+		function escapeHtml(value) {
+			return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+				"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+			})[c]);
 		}
 
 		function render(container, data) {
-			const cityName = data.city || "未知城市";
-			const district = data.district && data.district !== cityName ? ` · ${data.district}` : "";
-			const temp = data.temperature != null ? `${data.temperature}°` : "--";
+			const cityName = escapeHtml(data.city || "未知城市");
+			const rawDistrict = data.district && data.district !== data.city ? data.district : "";
+			const district = rawDistrict ? ` · ${escapeHtml(rawDistrict)}` : "";
+			const temp = data.temperature != null ? `${escapeHtml(data.temperature)}°` : "--";
+			const weatherText = escapeHtml(data.weather || "");
 			const alertHtml = (data.alerts && data.alerts.length > 0)
-				? `<div class="mt-2 pt-2 border-t border-neutral-200 dark:border-neutral-700 text-xs text-amber-600 dark:text-amber-400 leading-relaxed">⚠️ ${data.alerts[0].title}</div>`
+				? `<div class="mt-2 pt-2 border-t border-(--line-divider) text-xs text-amber-600 dark:text-amber-400 leading-relaxed flex items-start gap-1.5">${alertSvg}<span>${escapeHtml(data.alerts[0].title)}</span></div>`
 				: "";
 
 			container.innerHTML = `
@@ -114,14 +161,14 @@ const iconMap: Record<string, string> = {
 					<div class="min-w-0">
 						<div class="text-sm text-neutral-500 dark:text-neutral-400 truncate">${cityName}${district}</div>
 						<div class="flex items-baseline gap-1 mt-0.5">
-							<span class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">${temp}</span>
-							<span class="text-sm text-neutral-600 dark:text-neutral-300">${data.weather || ""}</span>
+							<span class="text-3xl font-bold tabular-nums tracking-tight text-neutral-900 dark:text-neutral-100">${temp}</span>
+							<span class="text-sm text-neutral-600 dark:text-neutral-300">${weatherText}</span>
 						</div>
 						<div class="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-							湿度 ${data.humidity ?? "--"}% · ${data.wind_direction || ""}${data.wind_power || ""}
+							湿度 ${escapeHtml(data.humidity ?? "--")}% · ${escapeHtml(data.wind_direction || "")}${escapeHtml(data.wind_power || "")}
 						</div>
 					</div>
-					<div class="text-4xl shrink-0" title="${data.weather || ""}">${emoji(data.weather_icon)}</div>
+					<div class="text-4xl shrink-0 text-(--primary)" title="${weatherText}" role="img" aria-label="${weatherText}">${weatherIcon(data.weather_icon)}</div>
 				</div>
 				${alertHtml}
 			`;

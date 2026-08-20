@@ -71,6 +71,8 @@
       content: none;
     }
 
+    /* 细边框增强 inline code 层次（不影响代码块内的 code，见下方重置） */
+    border: 1px solid color-mix(in oklch, var(--inline-code-color) 16%, transparent);
     counter-reset: line;
 
     span.line {
@@ -86,6 +88,11 @@
         display: none;
       }
     }
+  }
+
+  /* 代码块内的 code 不加边框 */
+  .expressive-code code {
+    border: none;
   }
 
   .expressive-code {

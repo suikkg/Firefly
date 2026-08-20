@@ -38,7 +38,7 @@ const description = "YouTube 歌单播放，登录你的 YouTube 账号可无广
           <div
             class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70"
           >
-            <Icon is:inline name="material-symbols:music-note" class="text-[1.5rem]" />
+            <Icon is:inline name="lucide:music" class="text-[1.5rem]" />
           </div>
           <div class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">
             {title}
@@ -54,12 +54,16 @@ const description = "YouTube 歌单播放，登录你的 YouTube 账号可无广
           <div class="space-y-8">
             {YOUTUBE_PLAYLISTS.map((playlist) => (
               <div>
-                <h3 class="mb-3 text-lg font-bold text-neutral-800 dark:text-neutral-100">
-                  🎵 {playlist.name}
+                <h3 class="mb-3 flex items-center gap-2 text-lg font-bold text-neutral-800 dark:text-neutral-100">
+                  <Icon is:inline name="lucide:list-music" class="shrink-0 text-(--primary)" />
+                  {playlist.name}
                 </h3>
-                <p class="mb-3 text-sm text-neutral-500 dark:text-neutral-400">
-                  🎧 提示：登录你的 YouTube 账号（Premium 会员）后可无广告完整播放；
-                  未登录时部分歌曲可能插播广告。
+                <p class="mb-3 flex items-start gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+                  <Icon is:inline name="lucide:headphones" class="mt-0.5 shrink-0" />
+                  <span>
+                    提示：登录你的 YouTube 账号（Premium 会员）后可无广告完整播放；
+                    未登录时部分歌曲可能插播广告。
+                  </span>
                 </p>
                 <div class="overflow-hidden rounded-xl bg-black/5 dark:bg-white/5">
                   <iframe
@@ -76,8 +80,9 @@ const description = "YouTube 歌单播放，登录你的 YouTube 账号可无广
           </div>
         ) : (
           <div class="py-12 text-center">
-            <p class="text-lg text-neutral-700 dark:text-neutral-200">
-              🎵 音乐页面即将上线
+            <p class="flex items-center justify-center gap-2 text-lg text-neutral-700 dark:text-neutral-200">
+              <Icon is:inline name="lucide:music" class="shrink-0 text-(--primary)" />
+              音乐页面即将上线
             </p>
             <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
               请先在 <code>src/pages/music.astro</code> 中填入你的 YouTube 歌单 ID
@@ -87,9 +92,12 @@ const description = "YouTube 歌单播放，登录你的 YouTube 账号可无广
       }
 
       <!-- 本地音乐说明 -->
-      <div class="mt-6 rounded-xl border border-neutral-200 dark:border-neutral-700 p-4 text-sm text-neutral-500 dark:text-neutral-400">
-        📻 侧边栏的音乐播放器播放本地音乐（无需登录，无广告），
-        如需调整歌曲请修改 <code>src/config/musicConfig.ts</code> 的本地播放列表。
+      <div class="mt-6 flex items-start gap-2 rounded-xl border border-neutral-200 dark:border-neutral-700 p-4 text-sm text-neutral-500 dark:text-neutral-400">
+        <Icon is:inline name="lucide:radio" class="mt-0.5 shrink-0" />
+        <span>
+          侧边栏的音乐播放器播放本地音乐（无需登录，无广告），
+          如需调整歌曲请修改 <code>src/config/musicConfig.ts</code> 的本地播放列表。
+        </span>
       </div>
     </div>
   </div>

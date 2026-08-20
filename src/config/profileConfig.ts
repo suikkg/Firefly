@@ -23,25 +23,25 @@ export const profileConfig: ProfileConfig = {
 	links: [
 		{
 			name: "qq",
-			icon: "fa7-brands:qq",
+			icon: "simple-icons:qq",
 			url: "https://qm.qq.com/q/ZGsFa8qX2G",
 			showName: false,
 		},
 		{
 			name: "GitHub",
-			icon: "fa7-brands:github",
+			icon: "lucide:github",
 			url: "https://github.com/suikkg",
 			showName: false,
 		},
 		{
 			name: "Email",
-			icon: "fa7-solid:envelope",
+			icon: "lucide:mail",
 			url: "mailto:kkintoc@gmail.com",
 			showName: false,
 		},
 		{
 			name: "RSS",
-			icon: "fa7-solid:rss",
+			icon: "lucide:rss",
 			url: "/rss/",
 			showName: false,
 		},

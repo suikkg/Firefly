@@ -41,6 +41,8 @@ interface Props {
 	lang?: string;
 	setOGTypeArticle?: boolean;
 	postSlug?: string;
+	/** 旧版界面这类与默认版重复的页面传 true，避免和新版抢收录 */
+	noindex?: boolean;
 }
 
 let { title, description, lang, setOGTypeArticle, postSlug } = Astro.props;
@@ -130,6 +132,7 @@ const siteLang = lang.replace("_", "-");
         <meta name="keywords" content={siteConfig.keywords.join(", ")} />
       )
     }
+    {Astro.props.noindex && <meta name="robots" content="noindex, follow" />}
     <meta name="author" content={profileConfig.name} />
 
     <meta property="og:site_name" content={siteConfig.title} />

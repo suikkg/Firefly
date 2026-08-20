@@ -144,14 +144,19 @@ export default defineConfig({
 			},
 		}),
 		icon({
+			// 图标统一使用 Lucide；simple-icons 仅保留 Lucide 未收录的品牌标识
 			include: {
-				"material-symbols": ["*"],
-				"fa7-brands": ["*"],
-				"fa7-regular": ["*"],
-				"fa7-solid": ["*"],
-				"simple-icons": ["*"],
-				mdi: ["*"],
-				mingcute: ["*"],
+				lucide: ["*"],
+				"simple-icons": [
+					"afdian",
+					"alipay",
+					"gitee",
+					"kofi",
+					"nodedotjs",
+					"pnpm",
+					"qq",
+					"wechat",
+				],
 			},
 		}),
 		expressiveCode({
@@ -234,6 +239,10 @@ export default defineConfig({
 				// 根据页面开关配置过滤sitemap
 				const url = new URL(page);
 				const pathname = url.pathname;
+				// 旧版界面是默认版的重复内容，不进 sitemap
+				if (pathname.startsWith("/classic/")) {
+					return false;
+				}
 				if (pathname === "/dynamic/" && !siteConfig.pages.dynamic) {
 					return false;
 				}

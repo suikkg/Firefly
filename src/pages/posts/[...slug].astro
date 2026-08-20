@@ -1,595 +1,1089 @@
 ---
 import { render } from "astro:content";
-import Comment from "@components/comment/index.astro";
-import Markdown from "@components/common/Markdown.astro";
-import EncryptedPost from "@components/features/EncryptedPost.astro";
-import KatexManager from "@components/features/KatexManager.astro";
-import License from "@components/misc/License.astro";
-import I18nKey from "@i18n/i18nKey";
-import { i18n } from "@i18n/translation";
-import MainGridLayout from "@layouts/MainGridLayout.astro";
-import { getRelatedPosts, getSortedPosts } from "@utils/content-utils";
-import {
-	getFileDirFromPath,
-	getPostUrlBySlug,
-	removeFileExtension,
-} from "@utils/url-utils";
+// ─────────────────────────────────────────────────────────────────────────
+// 先锋方向概念稿 · 文章页
+// 正文排版是这套语言最吃功力的地方：字号阶梯、行长、行距、留白节奏，
+// 以及标题/引用/代码/图片之间的层级关系，全部在这里重新定义。
+// ─────────────────────────────────────────────────────────────────────────
+import type { GetStaticPaths } from "astro";
 import { Icon } from "astro-icon/components";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
-import CoverImage from "@/components/common/CoverImage.astro";
-import PostMetadata from "@/components/layout/PostMeta.astro";
-import RecommendedPost from "@/components/misc/RecommendedPost.astro";
-import SharePoster from "@/components/misc/SharePoster.svelte";
-import { coverImageConfig } from "@/config/coverImageConfig";
-import { licenseConfig } from "@/config/licenseConfig";
-import { profileConfig } from "@/config/profileConfig";
-import { siteConfig } from "@/config/siteConfig";
-import { sponsorConfig } from "@/config/sponsorConfig";
-import { formatDateToYYYYMMDD } from "@/utils/date-utils";
-import { getApiUrlList, processCoverImageSync } from "@/utils/image-utils";
-import { url } from "@/utils/url-utils";
+import Comment from "@/components/comment/index.astro";
+import EncryptedPost from "@/components/features/EncryptedPost.astro";
+import FancyboxManager from "@/components/features/FancyboxManager.astro";
+import KatexManager from "@/components/features/KatexManager.astro";
+import LabHead from "@/components/lab/LabHead.astro";
+import { siteConfig } from "@/config";
+import { getSortedPosts } from "@/utils/content-utils";
+// 提醒框（callouts）样式由插件主题提供，概念稿不引全局表，得自己带一份
+import "@rehype-callouts-theme";
+import "@/styles/lab.css";
 
-export async function getStaticPaths() {
-	const blogEntries = await getSortedPosts();
-	return blogEntries.map((entry) => {
-		// 将 id 转换为 slug（移除扩展名）以匹配路由参数
-		const slug = removeFileExtension(entry.id);
-		return {
-			params: { slug },
-			props: { entry },
-		};
-	});
+export const getStaticPaths = (async () => {
+	const posts = await getSortedPosts();
+	return posts.map((entry, index) => ({
+		params: { slug: entry.id },
+		props: {
+			entry,
+			prev: posts[index + 1] ?? null,
+			next: posts[index - 1] ?? null,
+		},
+	}));
+}) satisfies GetStaticPaths;
+
+const { entry, prev, next } = Astro.props;
+const { Content, headings, remarkPluginFrontmatter } = await render(entry);
+
+const words: number = remarkPluginFrontmatter?.words ?? 0;
+const minutes: number = remarkPluginFrontmatter?.minutes ?? 0;
+
+const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
+	year: "numeric",
+	month: "2-digit",
+	day: "2-digit",
+});
+
+// 只取 h2/h3 进目录：h4 以下放进来会让侧栏变成第二篇文章。
+// autolink-headings 会把锚点的 "#" 并进 heading.text，这里去掉。
+const tocItems = headings
+	.filter((h) => h.depth === 2 || h.depth === 3)
+	.map((h) => ({ ...h, text: h.text.replace(/#+\s*$/, "").trim() }));
+
+function usableImage(src: string): string {
+	if (!src) return "";
+	if (src.startsWith("http://") || src.startsWith("https://")) return src;
+	if (src.startsWith("/")) return src;
+	return "";
 }
+const cover = usableImage(entry.data.image);
 
-const { entry } = Astro.props;
-const { Content, headings } = await render(entry);
-
-const { remarkPluginFrontmatter } = await render(entry);
-
-const bannerPostMeta = {
-	title: entry.data.title,
-	description: entry.data.description,
-	published: entry.data.published,
-	updated: entry.data.updated,
-	words: remarkPluginFrontmatter.words,
-	minutes: remarkPluginFrontmatter.minutes,
-};
-
-// 处理随机图：如果image为"api"，则从配置的API获取随机图
-const processedImage = processCoverImageSync(entry.data.image, entry.id);
-const apiUrls = getApiUrlList(entry.data.image, entry.id);
-const showPostCover = Boolean(processedImage && coverImageConfig.enableInPost);
-const usePostCoverOverlay =
-	showPostCover && (coverImageConfig.enableInPostOverlay ?? true);
-
-const getDirectImageUrl = (src: string | undefined): string | null => {
-	if (!src) return null;
-	if (
-		src.startsWith("http://") ||
-		src.startsWith("https://") ||
-		src.startsWith("//") ||
-		src.startsWith("data:")
-	) {
-		return src;
-	}
-	return src.startsWith("/") ? url(src) : null;
-};
-
-// 海报优先复用页面上已经优化过的图片，本地源路径不再单独导入。
-const posterCoverUrl = showPostCover ? null : getDirectImageUrl(processedImage);
-const posterCoverSelector = showPostCover ? "#post-cover img" : null;
-const posterAvatarUrl = getDirectImageUrl(profileConfig.avatar);
-const posterAvatarSelector = profileConfig.avatar
-	? ".profile-avatar-image img"
-	: null;
-
-dayjs.extend(utc);
-
-const jsonLd = {
-	"@context": "https://schema.org",
-	"@type": "BlogPosting",
-	headline: entry.data.title,
-	description: entry.data.description || entry.data.title,
-	keywords: entry.data.tags,
-	author: {
-		"@type": "Person",
-		name: profileConfig.name,
-		url: Astro.site,
-	},
-	datePublished: formatDateToYYYYMMDD(entry.data.published),
-	inLanguage: entry.data.lang
-		? entry.data.lang.replace("_", "-")
-		: siteConfig.lang.replace("_", "-"),
-	// TODO include cover image here
-};
-
-const relatedPosts = await getRelatedPosts(entry, 5);
+// 带密码的文章必须走构建期加密：直接渲染 <Content /> 会把正文明文写进 HTML
+const isEncrypted = !!entry.data.password;
 ---
 
-<MainGridLayout
-  banner={processedImage}
-  title={entry.data.title}
-  description={entry.data.description}
-  lang={entry.data.lang}
-  setOGTypeArticle={true}
-  postSlug={entry.id}
-  postCategory={entry.data.category || undefined}
-  headings={headings}
-  encrypted={!!entry.data.password}
-  bannerPostMeta={bannerPostMeta}
->
-  <!-- KaTeX 按需加载 - 仅在文章页面 -->
-  <KatexManager slot="head" />
-  
-  <script
-    is:inline
-    slot="head"
-    type="application/ld+json"
-    set:html={JSON.stringify(jsonLd)}
-  />
-  <div
-    class="flex w-full rounded-(--radius-large) overflow-hidden relative mb-4"
-  >
-    <div
-      id="post-container"
-      class:list={[
-        "card-base z-10 px-6 md:px-9 pt-6 pb-4 relative w-full ",
-        {},
-      ]}
-    >
-      {
-        usePostCoverOverlay && processedImage && (
-          <div class="-mx-6 md:-mx-9 -mt-6 mb-6 h-48 md:h-64 relative onload-animation">
-            <CoverImage
-              id="post-cover"
-              src={processedImage}
-              basePath={getFileDirFromPath(entry.filePath || "")}
-              class="h-full"
-              preview={false}
-              apiUrls={apiUrls}
-            />
-            <div class="absolute inset-x-4 top-3 z-10 flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs font-medium text-white drop-shadow-[0_1px_2px_rgb(0_0_0/0.9)]">
-              <div class="flex items-center gap-1 whitespace-nowrap">
-                <Icon is:inline name="material-symbols:notes-rounded" class="text-base" />
-                <span>
-                  {remarkPluginFrontmatter.words}
-                  {" " + i18n(remarkPluginFrontmatter.words === 1 ? I18nKey.wordCount : I18nKey.wordsCount)}
-                </span>
-              </div>
-              <div class="flex items-center gap-1 whitespace-nowrap">
-                <Icon is:inline name="material-symbols:schedule-outline-rounded" class="text-base" />
-                <span>
-                  {remarkPluginFrontmatter.minutes}
-                  {" " + i18n(remarkPluginFrontmatter.minutes === 1 ? I18nKey.minuteCount : I18nKey.minutesCount)}
-                </span>
-              </div>
-              {entry.data.password && (
-                <div class="flex items-center gap-1 whitespace-nowrap">
-                  <Icon is:inline name="material-symbols:lock-outline" class="text-base" />
-                  <span>{i18n(I18nKey.postEncrypted)}</span>
-                </div>
-              )}
-            </div>
-            <div class="absolute inset-x-0 bottom-0 px-6 md:px-9 pt-10 pb-3 bg-gradient-to-t from-black/80 via-black/45 to-transparent">
-              <div
-                data-pagefind-body
-                data-pagefind-weight="10"
-                data-pagefind-meta="title"
-                class="mb-2 text-xl md:text-2xl font-bold leading-tight text-white"
-              >
-                {entry.data.title}
-              </div>
-              <PostMetadata
-                variant="cover"
-                className="gap-x-4 gap-y-1"
-                published={entry.data.published}
-                updated={entry.data.updated}
-                category={entry.data.category || undefined}
-                tags={entry.data.tags}
-                id={entry.id}
-              />
-            </div>
-          </div>
-        )
-      }
+<html lang="zh-CN">
+	<head>
+		<LabHead
+			title={entry.data.title}
+			description={entry.data.description || siteConfig.description}
+			postSlug={entry.id}
+			ogType="article"
+		/>
+		<KatexManager />
+	</head>
 
-      <!-- word count and reading time -->
-      {
-        !usePostCoverOverlay && (
-          <div
-            class="flex flex-row text-black/30 dark:text-white/30 gap-5 mb-3 transition onload-animation"
-          >
-            <div class="flex flex-row items-center">
-              <div
-                class="transition h-6 w-6 rounded-md bg-black/5 dark:bg-white/10 text-black/50 dark:text-white/50 flex items-center justify-center mr-2"
-              >
-                <Icon is:inline name="material-symbols:notes-rounded" />
-              </div>
-              <div class="text-sm">
-                {remarkPluginFrontmatter.words}
-                {" " + i18n(I18nKey.wordsCount)}
-              </div>
-            </div>
-            <div class="flex flex-row items-center">
-              <div
-                class="transition h-6 w-6 rounded-md bg-black/5 dark:bg-white/10 text-black/50 dark:text-white/50 flex items-center justify-center mr-2"
-              >
-                <Icon is:inline name="material-symbols:schedule-outline-rounded" />
-              </div>
-              <div class="text-sm">
-                {remarkPluginFrontmatter.minutes}
-                {
-                  " " +
-                    i18n(
-                      remarkPluginFrontmatter.minutes === 1
-                        ? I18nKey.minuteCount
-                        : I18nKey.minutesCount
-                    )
-                }
-              </div>
-            </div>
-            {entry.data.password && (
-              <div class="flex flex-row items-center">
-                <div
-                  class="transition h-6 w-6 rounded-md bg-black/5 dark:bg-white/10 text-black/50 dark:text-white/50 flex items-center justify-center mr-2"
-                >
-                  <Icon is:inline name="material-symbols:lock-outline" />
-                </div>
-                <div class="text-sm">
-                  {i18n(I18nKey.postEncrypted)}
-                </div>
-              </div>
-            )}
-          </div>
-        )
-      }
+	<body>
+		<!-- 阅读进度：一条 1px 的线，不抢视线 -->
+		<div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
 
-      <!-- title -->
-      {
-        !usePostCoverOverlay && (
-          <div class="relative onload-animation">
-            <div
-              data-pagefind-body
-              data-pagefind-weight="10"
-              data-pagefind-meta="title"
-              class="transition w-full block font-bold mb-3
-                        text-3xl md:text-[2.25rem]/[2.75rem]
-                        text-black/90 dark:text-white/90
-                        md:before:w-1 before:h-5 before:rounded-md before:bg-(--primary)
-                        before:absolute before:top-3 before:-left-4.5"
-            >
-              {entry.data.title}
-            </div>
-          </div>
-        )
-      }
+		<header class="topbar">
+			<a href="/" class="circle-btn" aria-label="返回索引">
+				<Icon is:inline name="lucide:arrow-left" />
+			</a>
+			<span class="topbar-title micro" id="topbar-title">{entry.data.title}</span>
+			<button id="theme-toggle" class="circle-btn" type="button" aria-label="切换明暗">
+				<Icon is:inline name="lucide:sun-moon" />
+			</button>
+		</header>
 
-      <!-- metadata -->
-      {
-        !usePostCoverOverlay && (
-          <div class="onload-animation">
-            <PostMetadata
-              className="mb-5"
-              published={entry.data.published}
-              updated={entry.data.updated}
-              tags={entry.data.tags}
-              category={entry.data.category || undefined}
-              id={entry.id}
-            />
-            {
-              !showPostCover && (
-                <div class="border-(--line-divider) border-dashed border-b mt-3 mb-5" />
-              )
-            }
-          </div>
-        )
-      }
+		<!-- 标题区：占满一屏宽度，元信息用等宽小字压在底部 -->
+		<section class="masthead">
+			<p class="kicker micro">
+				<span>{entry.data.category || "未分类"}</span>
+				<span class="kicker-sep">/</span>
+				<span>{dateFormatter.format(entry.data.published)}</span>
+			</p>
 
-      {
-        showPostCover && !usePostCoverOverlay && processedImage && (
-          <div class="mt-4">
-            <CoverImage
-              id="post-cover"
-              src={processedImage}
-              basePath={getFileDirFromPath(entry.filePath || "")}
-              class="mb-8 rounded-xl banner-container onload-animation"
-              preview={false}
-              apiUrls={apiUrls}
-            />
-          </div>
-        )
-      }
+			<h1 class="title">{entry.data.title}</h1>
 
-      {entry.data.password ? (
-        <EncryptedPost password={entry.data.password} slug={entry.id} hint={entry.data.passwordHint}>
-          <Markdown class="mb-6 markdown-content onload-animation">
-            <Content />
-          </Markdown>
+			{entry.data.description && <p class="standfirst">{entry.data.description}</p>}
 
-          {/* 打赏按钮 & 分享按钮 */}
-          {
-            (siteConfig.post.sharePoster || (sponsorConfig.showButtonInPost && siteConfig.pages.sponsor)) && (
-              <div class="mb-6 rounded-xl onload-animation">
-                <div class="p-6 bg-(--license-block-bg) rounded-xl">
-                  <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div class="flex items-center gap-3 flex-1">
-                      <div class="h-12 w-12 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70 shrink-0">
-                        <Icon is:inline
-                          name={sponsorConfig.showButtonInPost &&
-                          siteConfig.pages.sponsor
-                            ? "material-symbols:favorite"
-                            : "material-symbols:share"}
-                          class="text-2xl"
-                        />
-                      </div>
-                      <div>
-                        <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-1">
-                          {
-                            sponsorConfig.showButtonInPost && siteConfig.pages.sponsor
-                              ? i18n(I18nKey.sponsorButton)
-                              : i18n(I18nKey.shareOnSocial)
-                          }
-                        </h3>
-                        <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                          {
-                            sponsorConfig.showButtonInPost && siteConfig.pages.sponsor
-                              ? i18n(I18nKey.sponsorButtonText)
-                              : i18n(I18nKey.shareOnSocialDescription)
-                          }
-                        </p>
-                      </div>
-                    </div>
-                    <div class="flex items-center gap-3">
-                      {
-                        siteConfig.post.sharePoster && (
-                          <SharePoster
-                            client:load
-                            title={entry.data.title}
-                            author={profileConfig.name}
-                            description={entry.data.description || entry.data.title}
-                            pubDate={formatDateToYYYYMMDD(entry.data.published)}
-                            coverImage={posterCoverUrl}
-                            coverImageSelector={posterCoverSelector}
-                            url={Astro.url.href}
-                            siteTitle={siteConfig.title}
-                            avatar={posterAvatarUrl}
-                            avatarSelector={posterAvatarSelector}
-                          />
-                        )
-                      }
-                      {
-                        sponsorConfig.showButtonInPost && siteConfig.pages.sponsor && (
-                          <a
-                            href={url("/sponsor/")}
-                            class="inline-flex items-center gap-2 px-6 py-3 bg-(--primary) text-white dark:text-black/70 rounded-lg font-medium hover:bg-(--primary)/80 hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
-                          >
-                            <span>{i18n(I18nKey.sponsor)}</span>
-                            <Icon is:inline name="fa7-solid:arrow-right" class="text-sm" />
-                          </a>
-                        )
-                      }
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          }
+			<div class="masthead-meta">
+				<div class="meta-cell">
+					<span class="micro">字数</span>
+					<span class="meta-val">{words.toLocaleString("en-US")}</span>
+				</div>
+				<div class="meta-cell">
+					<span class="micro">阅读</span>
+					<span class="meta-val">{minutes} 分钟</span>
+				</div>
+				<div class="meta-cell">
+					<span class="micro">{isEncrypted ? "状态" : "章节"}</span>
+					<span class="meta-val">
+						{isEncrypted ? "已加密" : String(tocItems.length).padStart(2, "0")}
+					</span>
+				</div>
+				{
+					entry.data.tags.length > 0 && (
+						<div class="meta-cell meta-tags">
+							<span class="micro">标签</span>
+							<span class="meta-val">{entry.data.tags.join(" · ")}</span>
+						</div>
+					)
+				}
+			</div>
+		</section>
 
-          {
-            licenseConfig.enable && (
-              <License
-                title={entry.data.title}
-                id={entry.id}
-                pubDate={entry.data.published}
-                author={entry.data.author}
-                sourceLink={entry.data.sourceLink}
-                licenseName={entry.data.licenseName}
-                licenseUrl={entry.data.licenseUrl}
-                class="mb-6 rounded-xl license-container onload-animation"
-              />
-            )
-          }
-        </EncryptedPost>
-      ) : (
-        <>
-          <Markdown class="mb-6 markdown-content onload-animation">
-            <Content />
-          </Markdown>
+		{
+			cover && (
+				<figure class="cover">
+					<img src={cover} alt={entry.data.title} loading="eager" decoding="async" />
+				</figure>
+			)
+		}
 
-          {/* 打赏按钮 & 分享按钮 */}
-          {
-            (siteConfig.post.sharePoster || (sponsorConfig.showButtonInPost && siteConfig.pages.sponsor)) && (
-              <div class="mb-6 rounded-xl onload-animation">
-                <div class="p-6 bg-(--license-block-bg) rounded-xl">
-                  <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div class="flex items-center gap-3 flex-1">
-                      <div class="h-12 w-12 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70 shrink-0">
-                        <Icon is:inline
-                          name={sponsorConfig.showButtonInPost &&
-                          siteConfig.pages.sponsor
-                            ? "material-symbols:favorite"
-                            : "material-symbols:share"}
-                          class="text-2xl"
-                        />
-                      </div>
-                      <div>
-                        <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-1">
-                          {
-                            sponsorConfig.showButtonInPost && siteConfig.pages.sponsor
-                              ? i18n(I18nKey.sponsorButton)
-                              : i18n(I18nKey.shareOnSocial)
-                          }
-                        </h3>
-                        <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                          {
-                            sponsorConfig.showButtonInPost && siteConfig.pages.sponsor
-                              ? i18n(I18nKey.sponsorButtonText)
-                              : i18n(I18nKey.shareOnSocialDescription)
-                          }
-                        </p>
-                      </div>
-                    </div>
-                    <div class="flex items-center gap-3">
-                      {
-                        siteConfig.post.sharePoster && (
-                          <SharePoster
-                            client:load
-                            title={entry.data.title}
-                            author={profileConfig.name}
-                            description={entry.data.description || entry.data.title}
-                            pubDate={formatDateToYYYYMMDD(entry.data.published)}
-                            coverImage={posterCoverUrl}
-                            coverImageSelector={posterCoverSelector}
-                            url={Astro.url.href}
-                            siteTitle={siteConfig.title}
-                            avatar={posterAvatarUrl}
-                            avatarSelector={posterAvatarSelector}
-                          />
-                        )
-                      }
-                      {
-                        sponsorConfig.showButtonInPost && siteConfig.pages.sponsor && (
-                          <a
-                            href={url("/sponsor/")}
-                            class="inline-flex items-center gap-2 px-6 py-3 bg-(--primary) text-white dark:text-black/70 rounded-lg font-medium hover:bg-(--primary)/80 hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
-                          >
-                            <span>{i18n(I18nKey.sponsor)}</span>
-                            <Icon is:inline name="fa7-solid:arrow-right" class="text-sm" />
-                          </a>
-                        )
-                      }
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          }
+		<!-- 目录轨：默认只是一列短横线，靠近才展开文字 -->
+		{
+			!isEncrypted && tocItems.length > 1 && (
+				<nav class="toc" id="toc" aria-label="目录">
+					<ul>
+						{tocItems.map((h) => (
+							<li class={`toc-item depth-${h.depth}`}>
+								<a href={`#${h.slug}`} data-toc-link={h.slug}>
+									<span class="toc-line" />
+									<span class="toc-text">{h.text}</span>
+								</a>
+							</li>
+						))}
+					</ul>
+				</nav>
+			)
+		}
 
-          {
-            licenseConfig.enable && (
-              <License
-                title={entry.data.title}
-                id={entry.id}
-                pubDate={entry.data.published}
-                author={entry.data.author}
-                sourceLink={entry.data.sourceLink}
-                licenseName={entry.data.licenseName}
-                licenseUrl={entry.data.licenseUrl}
-                class="mb-6 rounded-xl license-container onload-animation"
-              />
-            )
-          }
-        </>
-      )}
-    </div>
-  </div>
+		<article class="prose lab-prose" id="article">
+			{
+				isEncrypted ? (
+					<EncryptedPost
+						password={entry.data.password}
+						slug={entry.id}
+						hint={entry.data.passwordHint}
+					>
+						<Content />
+					</EncryptedPost>
+				) : (
+					<Content />
+				)
+			}
+		</article>
 
-  <!-- 上次编辑时间 -->
-  {
-    siteConfig.post.showLastModified && (() => {
-      const lastModified = dayjs(entry.data.updated || entry.data.published);
-      const dateStr = lastModified.format("YYYY-MM-DD");
-      const outdatedThreshold = siteConfig.post.outdatedThreshold ?? 1;
+		{
+			entry.data.comment && !isEncrypted && (
+				<section class="comments">
+					<h2 class="comments-title micro">评论</h2>
+					<Comment post={entry} />
+				</section>
+			)
+		}
 
-      // 1. 預設加上 hidden 隱藏，並把時間與閾值綁在 data-* 屬性
-      return (
-        <div 
-          id="outdated-card" 
-          class="card-base p-6 mb-4 hidden" 
-          data-date={lastModified.toISOString()} 
-          data-threshold={outdatedThreshold}
-        >
-          <div class="flex items-center gap-2">
-            <div class="transition h-9 w-9 rounded-lg overflow-hidden relative flex items-center justify-center mr-0">
-              <Icon is:inline
-                name="material-symbols:history-rounded"
-                class="text-4xl text-(--primary) transition-transform group-hover:translate-x-0.5 bg-(--enter-btn-bg) p-2 rounded-md"
-              />
-            </div>
+		<!-- 图片灯箱：脚本与样式都是按需加载，没有可放大的图片时不会触发 -->
+		<FancyboxManager />
 
-            <div class="flex flex-col gap-0.1">
-              <div class="text-[1.0rem] leading-tight text-black/75 dark:text-white/75">
-                {i18n(I18nKey.lastModifiedPrefix)}{dateStr}
-                <span id="days-ago-text" data-template={i18n(I18nKey.lastModifiedDaysAgo)}></span>
-              </div>
-              <p id="outdated-warning" class="text-[0.8rem] leading-tight text-black/75 dark:text-white/75 hidden">
-                {i18n(I18nKey.lastModifiedOutdated)}
-              </p>
-            </div>
-          </div>
-        </div>
-      );
-    })()
-  }
+		<footer class="footer">
+			<div class="pager">
+				{
+					prev ? (
+						<a class="pager-link prev" href={`/posts/${prev.id}/`}>
+							<span class="micro">
+								<Icon is:inline name="lucide:arrow-left" /> 上一篇
+							</span>
+							<span class="pager-title">{prev.data.title}</span>
+						</a>
+					) : (
+						<span />
+					)
+				}
+				{
+					next && (
+						<a class="pager-link next" href={`/posts/${next.id}/`}>
+							<span class="micro">
+								下一篇 <Icon is:inline name="lucide:arrow-right" />
+							</span>
+							<span class="pager-title">{next.data.title}</span>
+						</a>
+					)
+				}
+			</div>
 
-  <script>
-    const card = document.getElementById('outdated-card');
-    const dateStr = card?.dataset.date;
+			<div class="footer-meta micro">
+				<a href="/" class="back">
+					<Icon is:inline name="lucide:arrow-left" />
+					<span>全部文章</span>
+				</a>
+				<a href={`/classic/posts/${entry.id}/`} class="back">
+					<span>在旧版界面中查看</span>
+					<Icon is:inline name="lucide:layout-panel-left" />
+				</a>
+			</div>
+		</footer>
 
-    if (card && dateStr) {
-      // 讀取伺服器給的日期，用原生 Date 算出差異天數（避免向客戶端打包整個 dayjs）
-      const lastModified = new Date(dateStr);
-      const daysDiff = Math.floor(
-        (Date.now() - lastModified.getTime()) / 86400000,
-      );
-      const threshold = Number(card.dataset.threshold);
+		<style>
+			/* ── 进度 / 顶栏 ─────────────────────────────────────── */
+			.progress {
+				position: fixed;
+				inset: 0 0 auto;
+				height: 1px;
+				z-index: 90;
+				background: var(--hair);
+			}
 
-      // 如果超過閾值，就顯示卡片與提示文字
-      if (daysDiff >= threshold) {
-        card.classList.remove('hidden');
+			.progress span {
+				display: block;
+				height: 100%;
+				width: 0;
+				background: var(--accent);
+				transform-origin: left;
+			}
 
-        if (daysDiff >= 1) {
-          const textEl = document.getElementById('days-ago-text');
-          if (textEl && textEl.dataset.template) {
-            textEl.textContent = `，${textEl.dataset.template.replace("{days}", daysDiff.toString())}`;
-          }
+			.topbar {
+				position: fixed;
+				top: 0;
+				left: 0;
+				right: 0;
+				z-index: 80;
+				display: grid;
+				grid-template-columns: 2.4rem 1fr 2.4rem;
+				align-items: center;
+				gap: 1rem;
+				padding: 1.1rem var(--gutter);
+				/* 只在滚动后才铺底色，首屏保持通透 */
+				background: transparent;
+				transition: background-color 0.4s var(--ease-out);
+			}
 
-          const warningEl = document.getElementById('outdated-warning');
-          if (warningEl) {
-            warningEl.classList.remove('hidden');
-          }
-        }
-      }
-    }
-  </script>
+			.topbar.is-stuck {
+				background: color-mix(in oklch, var(--ground) 86%, transparent);
+				backdrop-filter: blur(14px);
+			}
 
-  <div
-    class="flex flex-col md:flex-row justify-between mb-4 gap-4 overflow-hidden w-full"
-  >
-    <a
-      href={entry.data.nextSlug ? getPostUrlBySlug(entry.data.nextSlug) : url("/")}
-      class="w-full font-bold overflow-hidden active:scale-95"
-    >
-      <div class="btn-card rounded-2xl w-full h-15 max-w-full px-4 flex items-center justify-start! gap-4">
-        <Icon is:inline
-          name="material-symbols:chevron-left-rounded"
-          class="text-[2rem] text-(--primary)"
-        />
-        <div class="overflow-hidden transition text-ellipsis whitespace-nowrap max-w-[calc(100%-3rem)] text-black/75 dark:text-white/75">
-          {entry.data.nextTitle || i18n(I18nKey.home)}
-        </div>
-      </div>
-    </a>
+			.topbar-title {
+				text-align: center;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				opacity: 0;
+				transition: opacity 0.4s var(--ease-out);
+			}
 
-    <a
-      href={entry.data.prevSlug ? getPostUrlBySlug(entry.data.prevSlug) : url("/")}
-      class="w-full font-bold overflow-hidden active:scale-95"
-    >
-      <div class="btn-card rounded-2xl w-full h-15 max-w-full px-4 flex items-center justify-end! gap-4">
-        <div class="overflow-hidden transition text-ellipsis whitespace-nowrap max-w-[calc(100%-3rem)] text-black/75 dark:text-white/75">
-          {entry.data.prevTitle || i18n(I18nKey.home)}
-        </div>
-        <Icon is:inline
-          name="material-symbols:chevron-right-rounded"
-          class="text-[2rem] text-(--primary)"
-        />
-      </div>
-    </a>
-  </div>
+			.topbar.is-stuck .topbar-title { opacity: 1; }
 
-  <RecommendedPost relatedPosts={relatedPosts} currentPostId={entry.id} />
+			/* ── 标题区 ──────────────────────────────────────────── */
+			.masthead {
+				max-width: var(--page-max);
+				margin-inline: auto;
+				padding: clamp(6rem, 16vh, 11rem) var(--gutter) clamp(2rem, 5vw, 3.5rem);
+			}
 
-  <!-- 评论 -->
-  {entry.data.comment && !entry.data.password && <Comment post={entry} />}
-</MainGridLayout>
+			.kicker {
+				display: flex;
+				align-items: center;
+				gap: 0.7rem;
+				margin: 0 0 clamp(1.2rem, 3vw, 2rem);
+			}
+
+			.kicker-sep { color: var(--accent); }
+
+			/* 大标题：字距随字号收紧，行距压到 0.98 让多行标题成块 */
+			.title {
+				margin: 0;
+				max-width: 18ch;
+				font-size: clamp(2.4rem, 6.4vw, 6rem);
+				font-weight: 800;
+				line-height: 0.98;
+				letter-spacing: -0.038em;
+				text-wrap: balance;
+				animation: fade-up 0.9s var(--ease-out) backwards;
+			}
+
+			/* 导语比正文大一档，作为标题与正文之间的过渡台阶 */
+			.standfirst {
+				max-width: 46ch;
+				margin: clamp(1.5rem, 3.5vw, 2.4rem) 0 0;
+				font-size: clamp(1.05rem, 1.5vw, 1.3rem);
+				line-height: 1.62;
+				color: var(--ink-soft);
+				text-wrap: pretty;
+				animation: fade-up 0.9s var(--ease-out) 0.1s backwards;
+			}
+
+			.masthead-meta {
+				display: flex;
+				flex-wrap: wrap;
+				gap: clamp(1.5rem, 4vw, 3.5rem);
+				margin-top: clamp(2rem, 5vw, 3.5rem);
+				padding-top: 1.2rem;
+				border-top: 1px solid var(--hair);
+				animation: fade-up 0.9s var(--ease-out) 0.2s backwards;
+			}
+
+			.meta-cell {
+				display: flex;
+				flex-direction: column;
+				gap: 0.4rem;
+			}
+
+			.meta-val {
+				font-size: 0.95rem;
+				font-variant-numeric: tabular-nums;
+			}
+
+			.meta-tags { max-width: 30ch; }
+
+			/* ── 封面 ────────────────────────────────────────────── */
+			.cover {
+				max-width: var(--page-max);
+				margin: 0 auto clamp(3rem, 8vw, 6rem);
+				padding: 0 var(--gutter);
+			}
+
+			.cover img {
+				display: block;
+				width: 100%;
+				max-height: 74vh;
+				object-fit: cover;
+				border-radius: 2px;
+			}
+
+			/* ── 目录轨 ──────────────────────────────────────────── */
+			.toc {
+				position: fixed;
+				top: 50%;
+				right: 1.6rem;
+				z-index: 50;
+				transform: translateY(-50%);
+				max-height: 70vh;
+				overflow: hidden;
+			}
+
+			.toc ul {
+				display: flex;
+				flex-direction: column;
+				align-items: flex-end;
+				gap: 0.55rem;
+				margin: 0;
+				padding: 0;
+				list-style: none;
+			}
+
+			.toc a {
+				display: flex;
+				align-items: center;
+				justify-content: flex-end;
+				gap: 0.6rem;
+				text-decoration: none;
+				color: var(--ink-soft);
+			}
+
+			/* 平时只是一列长短不一的横线，构成一张缩略的文章地形图 */
+			.toc-line {
+				display: block;
+				width: 1.4rem;
+				height: 1px;
+				background: var(--ink-mute);
+				transition:
+					width 0.45s var(--spring),
+					background-color 0.35s var(--ease-out);
+			}
+
+			.toc-item.depth-3 .toc-line { width: 0.8rem; }
+
+			.toc-text {
+				max-width: 0;
+				overflow: hidden;
+				white-space: nowrap;
+				font-size: 0.72rem;
+				opacity: 0;
+				transition:
+					max-width 0.5s var(--ease-out),
+					opacity 0.35s var(--ease-out);
+			}
+
+			.toc-item.is-active .toc-line {
+				width: 2.4rem;
+				background: var(--accent);
+			}
+
+			.toc:hover .toc-text,
+			.toc-item.is-active .toc-text {
+				max-width: 14rem;
+				opacity: 1;
+			}
+
+			.toc-item.is-active a { color: var(--ink); }
+
+			@media (max-width: 1280px) {
+				.toc { display: none; }
+			}
+
+			/* ══════════════════════════════════════════════════════
+			   正文
+			   ══════════════════════════════════════════════════════ */
+			/* 正文容器与标题区同宽同轴，行长再由子元素单独收窄——
+			   这样正文的左边缘和大标题严丝合缝，右侧空出来留给目录轨 */
+			.prose {
+				max-width: var(--page-max);
+				margin-inline: auto;
+				background: transparent;
+				padding: 0 var(--gutter) clamp(4rem, 10vw, 8rem);
+				font-size: 1.0625rem;
+				/* CJK 需要比拉丁更松的行距才不显得压抑 */
+				line-height: 1.86;
+				letter-spacing: 0.012em;
+				color: var(--ink);
+			}
+
+			/* remark-sectionize 会把正文按标题层层包进 <section>，
+			   所以限宽不能挂在直接子元素上——section 自身必须透传全宽，
+			   由具体的文字块各自收窄行长 */
+			.prose :global(section) {
+				max-width: none;
+			}
+
+			/* 块级公式默认会在整个容器里居中，导致它飘到正文右侧；
+			   收进行长内再居中，公式才和正文同轴 */
+			.prose :global(.math-display),
+			.prose :global(.katex-display) {
+				max-width: var(--measure);
+				overflow-x: auto;
+				overflow-y: hidden;
+				padding-bottom: 0.3rem;
+			}
+
+			.prose :global(p),
+			.prose :global(h2),
+			.prose :global(h3),
+			.prose :global(h4),
+			.prose :global(h5),
+			.prose :global(h6),
+			.prose :global(ul),
+			.prose :global(ol),
+			.prose :global(blockquote),
+			.prose :global(hr) {
+				max-width: var(--measure);
+			}
+
+			/* 图片、代码块、表格越过行长限制，给密集正文一个呼吸口 */
+			.prose :global(figure),
+			.prose :global(.expressive-code),
+			.prose :global(table) {
+				max-width: min(100%, calc(var(--measure) + 11rem));
+			}
+
+			/* expressive-code 内部也用 figure.frame 包代码，
+			   会被上面那条给图片写的限宽卡住，于是代码框比外层容器窄一圈，
+			   在容器边缘露出一条白边 */
+			.prose :global(.expressive-code figure) {
+				max-width: none;
+				margin: 0;
+			}
+
+			.prose :global(p) {
+				margin: 0 0 1.5em;
+				text-wrap: pretty;
+			}
+
+			/* 标题上方留白远大于下方，靠留白而不是分隔线划分章节 */
+			.prose :global(h2) {
+				position: relative;
+				margin: 2.6em 0 0.9em;
+				font-size: 1.65rem;
+				font-weight: 700;
+				line-height: 1.28;
+				letter-spacing: -0.02em;
+				text-wrap: balance;
+			}
+
+			/* 章节记号挂在版心外，不占正文行长 */
+			.prose :global(h2)::before {
+				content: "";
+				position: absolute;
+				left: -1.5rem;
+				top: 0.62em;
+				width: 0.6rem;
+				height: 1px;
+				background: var(--accent);
+			}
+
+			.prose :global(h3) {
+				margin: 2em 0 0.7em;
+				font-size: 1.28rem;
+				font-weight: 650;
+				line-height: 1.35;
+				letter-spacing: -0.014em;
+				text-wrap: balance;
+			}
+
+			.prose :global(h4) {
+				margin: 1.7em 0 0.6em;
+				font-size: 1.08rem;
+				font-weight: 650;
+			}
+
+			.prose :global(a) {
+				color: inherit;
+				text-decoration: none;
+				background-image: linear-gradient(var(--accent), var(--accent));
+				background-repeat: no-repeat;
+				background-position: 0 100%;
+				background-size: 100% 1px;
+				transition: background-size 0.35s var(--ease-out);
+			}
+
+			.prose :global(a:hover) {
+				background-size: 100% 0.35em;
+			}
+
+			.prose :global(strong) { font-weight: 700; }
+
+			/* rehype-autolink-headings 会在标题尾部塞一个 "#"，
+			   默认状态下把它藏进左侧留白，指到标题才显形 */
+			.prose :global(.anchor) {
+				position: absolute;
+				left: -2.6rem;
+				top: 0.5em;
+				background: none;
+				opacity: 0;
+				text-decoration: none;
+				transition: opacity 0.3s var(--ease-out);
+			}
+
+			.prose :global(.anchor-icon) {
+				font-family: var(--mono);
+				font-size: 0.85rem;
+				font-weight: 400;
+				color: var(--accent);
+			}
+
+			.prose :global(h2:hover .anchor),
+			.prose :global(h3:hover .anchor),
+			.prose :global(h4:hover .anchor),
+			.prose :global(.anchor:focus-visible) {
+				opacity: 1;
+			}
+
+			.prose :global(h3),
+			.prose :global(h4) {
+				position: relative;
+			}
+
+			.prose :global(ul),
+			.prose :global(ol) {
+				margin: 0 0 1.5em;
+				padding-left: 1.4em;
+			}
+
+			.prose :global(li) { margin-bottom: 0.45em; }
+
+			.prose :global(li)::marker { color: var(--accent); }
+
+			/* 引用：靠一条竖线和字体切换建立层级，不用底色块 */
+			.prose :global(blockquote) {
+				margin: 2em 0;
+				padding-left: 1.4rem;
+				border-left: 2px solid var(--accent);
+				font-size: 1.08em;
+				line-height: 1.7;
+				color: var(--ink-soft);
+			}
+
+			.prose :global(blockquote p:last-child) { margin-bottom: 0; }
+
+			.prose :global(code) {
+				font-family: var(--mono);
+				font-size: 0.88em;
+				padding: 0.15em 0.4em;
+				border-radius: 3px;
+				background: var(--hair);
+			}
+
+			/* 代码块由 expressive-code 负责配色，这里只处理外框与出血 */
+			.prose :global(.expressive-code) {
+				margin: 2em 0;
+				overflow: hidden;
+			}
+
+			.prose :global(.expressive-code code) {
+				background: none;
+				padding: 0;
+				font-size: inherit;
+			}
+
+			/* 图片与代码块允许溢出版心，给密集正文一个呼吸口 */
+			.prose :global(img) {
+				display: block;
+				width: 100%;
+				height: auto;
+				margin: 2em 0;
+				border-radius: 2px;
+			}
+
+			.prose :global(figure) { margin: 2.4em 0; }
+
+			.prose :global(figcaption) {
+				margin-top: 0.7rem;
+				font-family: var(--mono);
+				font-size: 0.7rem;
+				letter-spacing: 0.06em;
+				color: var(--ink-soft);
+				text-align: center;
+			}
+
+			.prose :global(hr) {
+				margin: 3em 0;
+				border: 0;
+				border-top: 1px solid var(--hair);
+			}
+
+			/* 表格
+			   width:100% 会把短内容的列平摊到整个出血宽度，
+			   一行里"§9.1.4"和"1 dB"隔着几百像素，眼睛根本连不起来。
+			   改成按内容定宽；display:block 同时让它自己横向滚动，
+			   不至于把页面撑出横向滚动条。 */
+			.prose :global(table) {
+				display: block;
+				width: fit-content;
+				max-width: 100%;
+				margin: 2em 0;
+				overflow-x: auto;
+				border-collapse: collapse;
+				font-size: 0.9em;
+				background: var(--card);
+				border-radius: var(--radius-sm);
+				box-shadow: var(--lift-1);
+			}
+
+			.prose :global(th),
+			.prose :global(td) {
+				padding: 0.68em 1.1em;
+				border-bottom: 1px solid var(--hair);
+				text-align: left;
+				white-space: nowrap;
+			}
+
+			/* 表头单独给一层浅色，和数据行拉开 */
+			.prose :global(thead th) {
+				position: sticky;
+				top: 0;
+				background: color-mix(in oklch, var(--accent) 8%, var(--card));
+				font-family: var(--mono);
+				font-size: 0.72em;
+				letter-spacing: 0.12em;
+				text-transform: uppercase;
+				color: var(--ink-soft);
+				font-weight: 400;
+			}
+
+			.prose :global(tbody tr:last-child td) {
+				border-bottom: 0;
+			}
+
+			.prose :global(tbody tr:hover td) {
+				background: var(--accent-wash);
+			}
+
+			/* 代码块也按 v2 的卡片语言给一层承载面 */
+			.prose :global(.expressive-code) {
+				max-width: 100%;
+				border-radius: var(--radius-sm);
+				box-shadow: var(--lift-1);
+			}
+
+			/* ── 加密文章的解锁界面 ───────────────────────────────
+			   组件本身用的是 Tailwind 工具类，而概念稿不引 Tailwind，
+			   所以这里得把这套界面完整重画一遍 */
+			.prose :global(#password-ui) {
+				display: flex;
+				justify-content: center;
+				padding: 3rem 0;
+			}
+
+			.prose :global(#password-ui > div) {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 0.75rem;
+				width: 100%;
+				max-width: 24rem;
+				padding: 2.25rem 2rem;
+				border: 1px solid var(--hair);
+				border-radius: 3px;
+			}
+
+			.prose :global(#password-ui h2) {
+				margin: 0.4rem 0 0;
+				font-size: 1.1rem;
+				font-weight: 650;
+				letter-spacing: -0.01em;
+			}
+
+			.prose :global(#password-ui p) {
+				margin: 0;
+				max-width: none;
+				font-size: 0.85rem;
+				line-height: 1.6;
+				text-align: center;
+				color: var(--ink-soft);
+			}
+
+			.prose :global(#password-ui svg) {
+				width: 2.4rem;
+				height: 2.4rem;
+				color: var(--accent);
+			}
+
+			.prose :global(#password-form) {
+				display: flex;
+				flex-direction: column;
+				gap: 0.6rem;
+				width: 100%;
+				margin-top: 0.5rem;
+			}
+
+			.prose :global(#password-input) {
+				width: 100%;
+				padding: 0.6rem 0.8rem;
+				border: 1px solid var(--hair);
+				border-radius: 3px;
+				background: none;
+				color: var(--ink);
+				font-family: var(--mono);
+				font-size: 0.85rem;
+				outline: none;
+				transition: border-color 0.3s var(--ease-out);
+			}
+
+			.prose :global(#password-input:focus) {
+				border-color: var(--accent);
+			}
+
+			.prose :global(#password-form button) {
+				width: 100%;
+				padding: 0.6rem 0.8rem;
+				border: 1px solid var(--ink);
+				border-radius: 3px;
+				background: var(--ink);
+				color: var(--ground);
+				font-family: var(--mono);
+				font-size: 0.75rem;
+				letter-spacing: 0.16em;
+				text-transform: uppercase;
+				cursor: pointer;
+				transition:
+					background-color 0.3s var(--ease-out),
+					color 0.3s var(--ease-out);
+			}
+
+			.prose :global(#password-form button:hover) {
+				background: none;
+				color: var(--ink);
+			}
+
+			.prose :global(#password-error) {
+				font-size: 0.78rem;
+				color: oklch(0.62 0.19 25);
+			}
+
+			.prose :global(#password-error.hidden),
+			.prose :global(#decrypted-content.hidden) {
+				display: none;
+			}
+
+			/* 解锁界面里的 h2 不是正文章节，不应该带左侧记号 */
+			.prose :global(#password-ui h2)::before {
+				display: none;
+			}
+
+			/* ── 评论区 ──────────────────────────────────────────
+			   组件外壳用的是 Tailwind 的 card-base，这里不引 Tailwind，
+			   所以自己给一层容器；Waline 自身的样式由它按需加载 */
+			.comments {
+				max-width: var(--page-max);
+				margin: 0 auto;
+				padding: clamp(2rem, 5vw, 3.5rem) var(--gutter) 0;
+			}
+
+			.comments-title {
+				padding-bottom: 1rem;
+				margin: 0 0 1.5rem;
+				border-bottom: 1px solid var(--hair);
+			}
+
+			.comments :global(#post-comments) {
+				max-width: var(--measure);
+			}
+
+			/* 组件里那圈装饰性背景圆在这套语言里是多余的 */
+			.comments :global(#post-comments > .absolute) {
+				display: none;
+			}
+
+			/* ── GitHub 仓库卡片 ─────────────────────────────────
+			   插件只吐结构不带样式，现有主题的那套挂在全局表里。
+			   这里按概念稿的语言重画：细线框 + 等宽元信息，不用圆角卡片。 */
+			.prose :global(a.card-github) {
+				display: block;
+				max-width: var(--measure);
+				margin: 2em 0;
+				padding: 1.1rem 1.25rem;
+				border: 1px solid var(--hair);
+				border-radius: 3px;
+				background: none;
+				text-decoration: none;
+				color: inherit;
+				transition: border-color 0.35s var(--ease-out);
+			}
+
+			.prose :global(a.card-github:hover) {
+				border-color: var(--accent);
+			}
+
+			/* .gc-titlebar-left 是普通 div，不设 flex 的话 owner / 斜杠 / repo
+			   会各占一行 */
+			.prose :global(.gc-titlebar),
+			.prose :global(.gc-titlebar-left) {
+				display: flex;
+				align-items: center;
+				gap: 0.45rem;
+				font-size: 1.05rem;
+				font-weight: 650;
+				letter-spacing: -0.015em;
+			}
+
+			.prose :global(.gc-owner) {
+				display: flex;
+				align-items: center;
+				gap: 0.45rem;
+			}
+
+			.prose :global(.gc-user) { color: var(--ink-soft); font-weight: 400; }
+			.prose :global(.gc-divider) { color: var(--ink-mute); }
+
+			.prose :global(.gc-avatar) {
+				width: 1.15rem;
+				height: 1.15rem;
+				border-radius: 50%;
+				background-size: cover;
+				background-position: center;
+				background-color: var(--hair);
+			}
+
+			.prose :global(.gc-description) {
+				margin-top: 0.55rem;
+				font-size: 0.9rem;
+				line-height: 1.6;
+				color: var(--ink-soft);
+			}
+
+			.prose :global(.gc-infobar) {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 1.4rem;
+				margin-top: 0.9rem;
+				padding-top: 0.7rem;
+				border-top: 1px solid var(--hair);
+				font-family: var(--mono);
+				font-size: 0.7rem;
+				letter-spacing: 0.08em;
+				color: var(--ink-soft);
+			}
+
+			/* 数据未回来之前是 "00K" 之类的占位，先压暗避免闪烁刺眼 */
+			.prose :global(a.card-github.fetch-waiting .gc-infobar),
+			.prose :global(a.card-github.fetch-waiting .gc-description) {
+				opacity: 0.4;
+			}
+
+			.prose :global(.github-logo) { display: none; }
+
+			/* ── 图表（Mermaid / PlantUML）────────────────────────
+			   构建期会同时产出亮色与深色两套 SVG，靠 CSS 决定显示哪一套；
+			   概念稿不引全局样式表，这套规则必须自带，否则暗色页面上
+			   会露出亮色版本，而且 SVG 会被拉伸到整个容器宽度 */
+			.prose :global(.diagram-container) {
+				max-width: min(100%, calc(var(--measure) + 11rem));
+				margin: 2.4em 0;
+				padding: 1.25rem;
+				border: 1px solid var(--hair);
+				border-radius: 3px;
+				background: color-mix(in oklch, var(--ink) 3%, transparent);
+			}
+
+			.prose :global(.mermaid-wrapper) { text-align: center; }
+
+			.prose :global(.mermaid-svg-light),
+			.prose :global(.mermaid-svg-dark) {
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				width: 100%;
+				overflow: hidden;
+			}
+
+			.prose :global(.mermaid-svg-light svg),
+			.prose :global(.mermaid-svg-dark svg) {
+				display: block;
+				/* 用 width:100% + max-height 会把 SVG 撑成整条，图形缩在中间
+				   两侧留出大片底色；按自身比例缩放才不会出现这种信箱边 */
+				width: auto;
+				height: auto;
+				max-width: 100%;
+				/* 不限高的话一张流程图能吃掉两屏；纵向图表按视口给一点余量，
+				   否则窄高的流程图被压到 420px 后字就看不清了 */
+				max-height: min(66vh, 560px);
+			}
+
+			.prose :global(.mermaid-svg-dark) { display: none; }
+			:global(html.dark) .prose :global(.mermaid-svg-light) { display: none; }
+			:global(html.dark) .prose :global(.mermaid-svg-dark) { display: flex; }
+
+			.prose :global(.plantuml-image) {
+				display: block;
+				width: 100%;
+				max-width: 100%;
+				max-height: 420px;
+				object-fit: contain;
+				margin: 0 auto;
+			}
+
+			@media (max-width: 768px) {
+				.prose :global(.mermaid-svg-light svg),
+				.prose :global(.mermaid-svg-dark svg),
+				.prose :global(.plantuml-image) {
+					max-height: 400px;
+				}
+			}
+
+			/* ── 页脚 ────────────────────────────────────────────── */
+			.footer {
+				padding: clamp(2rem, 6vw, 4rem) var(--gutter) 2rem;
+				border-top: 1px solid var(--hair);
+			}
+
+			.pager {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: clamp(1.5rem, 5vw, 4rem);
+				margin-bottom: clamp(2.5rem, 6vw, 4rem);
+			}
+
+			.pager-link {
+				display: flex;
+				flex-direction: column;
+				gap: 0.8rem;
+				color: inherit;
+				text-decoration: none;
+			}
+
+			.pager-link.next { text-align: right; }
+
+			.pager-title {
+				font-size: clamp(1.1rem, 2.2vw, 1.75rem);
+				font-weight: 650;
+				line-height: 1.2;
+				letter-spacing: -0.02em;
+				text-wrap: balance;
+				transition: color 0.3s var(--ease-out);
+			}
+
+			.pager-link:hover .pager-title { color: var(--accent); }
+
+			.footer-meta {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+			}
+
+			.back {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.6rem;
+				color: inherit;
+				text-decoration: none;
+				transition: color 0.3s var(--ease-out);
+			}
+
+			.back:hover { color: var(--accent); }
+
+			@media (max-width: 640px) {
+				.pager { grid-template-columns: 1fr; }
+				.pager-link.next { text-align: left; }
+			}
+		</style>
+
+		<script>
+			// ── 阅读进度 + 顶栏贴顶 ───────────────────────────────
+			const bar = document.getElementById("progress-bar");
+			const topbar = document.querySelector<HTMLElement>(".topbar");
+			const article = document.getElementById("article");
+
+			let ticking = false;
+
+			function onScroll(): void {
+				if (ticking) return;
+				ticking = true;
+				requestAnimationFrame(() => {
+					if (bar && article) {
+						// 进度按正文区间算，而不是整页 —— 读完最后一段就该是 100%
+						const start = article.offsetTop;
+						const span = article.offsetHeight - window.innerHeight;
+						const ratio = span > 0 ? (window.scrollY - start) / span : 1;
+						bar.style.width = `${Math.min(100, Math.max(0, ratio * 100))}%`;
+					}
+					topbar?.classList.toggle("is-stuck", window.scrollY > 120);
+					ticking = false;
+				});
+			}
+
+			window.addEventListener("scroll", onScroll, { passive: true });
+			onScroll();
+
+			// ── 目录高亮 ──────────────────────────────────────────
+			const links = new Map<string, HTMLElement>();
+			for (const a of document.querySelectorAll<HTMLElement>("[data-toc-link]")) {
+				const slug = a.dataset.tocLink;
+				if (slug) links.set(slug, a.closest(".toc-item") as HTMLElement);
+			}
+
+			const targets = [...links.keys()]
+				.map((slug) => document.getElementById(slug))
+				.filter((el): el is HTMLElement => el !== null);
+
+			if (targets.length > 0 && "IntersectionObserver" in window) {
+				let active: string | null = null;
+
+				const observer = new IntersectionObserver(
+					(entries) => {
+						// 取当前所有可见标题里最靠上的那个，避免多个同时命中时来回跳
+						const visible = entries
+							.filter((e) => e.isIntersecting)
+							.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+						if (!visible) return;
+						const id = visible.target.id;
+						if (id === active) return;
+						if (active) links.get(active)?.classList.remove("is-active");
+						links.get(id)?.classList.add("is-active");
+						active = id;
+					},
+					// 只认视口上部这一条带，读到哪一节就亮哪一节
+					{ rootMargin: "-10% 0px -70% 0px", threshold: 0 },
+				);
+
+				for (const t of targets) observer.observe(t);
+			}
+
+			// ── 明暗切换 ──────────────────────────────────────────
+			document.getElementById("theme-toggle")?.addEventListener("click", () => {
+				const dark = document.documentElement.classList.toggle("dark");
+				// 代码块配色跟着一起切
+				document.documentElement.setAttribute(
+					"data-theme",
+					dark ? "one-dark-pro" : "one-light",
+				);
+				try {
+					localStorage.setItem("theme", dark ? "dark" : "light");
+				} catch (e) {
+					/* 隐私模式下忽略 */
+				}
+			});
+		</script>
+	</body>
+</html>

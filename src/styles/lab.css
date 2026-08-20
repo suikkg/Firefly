@@ -1,0 +1,174 @@
+/* ==========================================================================
+   Lab 概念稿共享设计语言 · v2
+   --------------------------------------------------------------------------
+   v1 走的是黑白编辑部路线，把这个站最强的资产——插画、浅色薄荷调、
+   浮在壁纸上的白色圆角卡片——全删了。v2 保留这套底子，只在排版精度、
+   层次和动效上做加法。
+   只被 /lab/* 路由引入，不进入现有主题的全局样式表。
+   ========================================================================== */
+
+:root {
+	--hue: 165;
+
+	/* 纸面：极浅的薄荷灰，卡片是纯白，两者之间的微差构成层次 */
+	--ground: oklch(0.95 0.012 var(--hue));
+	/* 色相写成站点色相而不是 0：白色本身 chroma 为 0 看不出差别，
+	   但 color-mix 在 oklch 里会对色相插值——写 0 的话
+	   "白 + 一点薄荷绿"会被插成粉色 */
+	--card: oklch(1 0 var(--hue));
+	--card-soft: oklch(1 0 var(--hue) / 0.72);
+
+	--ink: oklch(0.29 0.02 var(--hue));
+	--ink-soft: oklch(0.29 0.02 var(--hue) / 0.62);
+	--ink-mute: oklch(0.29 0.02 var(--hue) / 0.38);
+	--hair: oklch(0.29 0.02 var(--hue) / 0.1);
+
+	/* 强调色沿用站点色相，和现有主题是同一套薄荷绿 */
+	--accent: oklch(0.72 0.13 var(--hue));
+	--accent-deep: oklch(0.58 0.13 var(--hue));
+	--accent-wash: oklch(0.72 0.13 var(--hue) / 0.12);
+
+	--mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Monaco,
+		Consolas, monospace;
+	--sans: "Inter", system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB",
+		"Microsoft YaHei", sans-serif;
+
+	--gutter: clamp(1rem, 4vw, 3.5rem);
+	--page-max: 1380px;
+	--measure: 66ch;
+	--radius: 1rem;
+	--radius-sm: 0.6rem;
+
+	/* 柔和的双层投影：近处接触影 + 远处环境影 */
+	--lift-1: 0 1px 2px rgb(16 40 32 / 0.04), 0 4px 14px -4px rgb(16 40 32 / 0.07);
+	--lift-2: 0 2px 4px -2px rgb(16 40 32 / 0.06), 0 14px 34px -8px rgb(16 40 32 / 0.12);
+	--lift-3: 0 6px 12px -6px rgb(16 40 32 / 0.1), 0 28px 60px -12px rgb(16 40 32 / 0.18);
+
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--spring: linear(
+		0, 0.0088, 0.0344, 0.1223 12.5%, 0.3363 21.5%, 0.5751 29.9%, 0.7712,
+		0.9096 43.4%, 0.9905 48.9%, 1.0325 54.5%, 1.0483 61.4%, 1.0417 69.3%,
+		1.0234 78.1%, 1.0057 89%, 1
+	);
+}
+
+html.dark {
+	--ground: oklch(0.17 0.014 var(--hue));
+	--card: oklch(0.235 0.016 var(--hue));
+	--card-soft: oklch(0.235 0.016 var(--hue) / 0.74);
+
+	--ink: oklch(0.95 0.008 var(--hue));
+	--ink-soft: oklch(0.95 0.008 var(--hue) / 0.6);
+	--ink-mute: oklch(0.95 0.008 var(--hue) / 0.36);
+	--hair: oklch(0.95 0.008 var(--hue) / 0.1);
+
+	--accent: oklch(0.78 0.13 var(--hue));
+	--accent-deep: oklch(0.84 0.11 var(--hue));
+	--accent-wash: oklch(0.78 0.13 var(--hue) / 0.16);
+
+	--lift-1: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 14px -4px rgb(0 0 0 / 0.35);
+	--lift-2: 0 2px 4px -2px rgb(0 0 0 / 0.4), 0 14px 34px -8px rgb(0 0 0 / 0.45);
+	--lift-3: 0 6px 12px -6px rgb(0 0 0 / 0.45), 0 28px 60px -12px rgb(0 0 0 / 0.5);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html {
+	background: var(--ground);
+	scroll-behavior: smooth;
+}
+
+body {
+	margin: 0;
+	/* 底色只挂在 html 上：body 若也铺一层不透明背景，
+	   会把 z-index 为负的固定壁纸层整个盖住 */
+	background: transparent;
+	color: var(--ink);
+	font-family: var(--sans);
+	font-synthesis-weight: none;
+	-webkit-font-smoothing: antialiased;
+	overflow-x: hidden;
+}
+
+/* ── 微型信息字样 ─────────────────────────────────────────────── */
+.micro {
+	font-family: var(--mono);
+	font-size: 0.66rem;
+	letter-spacing: 0.22em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+}
+
+/* ── 卡片 ────────────────────────────────────────────────────── */
+.card {
+	background: var(--card);
+	border-radius: var(--radius);
+	box-shadow: var(--lift-1);
+	transition:
+		transform 0.5s var(--spring),
+		box-shadow 0.5s var(--ease-out);
+}
+
+/* ── 圆形图标按钮 ─────────────────────────────────────────────── */
+.circle-btn {
+	display: grid;
+	place-items: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	border: 0;
+	border-radius: 50%;
+	background: var(--card-soft);
+	backdrop-filter: blur(12px);
+	color: var(--ink);
+	font-size: 1.05rem;
+	cursor: pointer;
+	text-decoration: none;
+	box-shadow: var(--lift-1);
+	transition:
+		background-color 0.3s var(--ease-out),
+		color 0.3s var(--ease-out),
+		transform 0.5s var(--spring);
+}
+
+.circle-btn:hover {
+	background: var(--accent);
+	color: #fff;
+	transform: translateY(-2px);
+}
+
+#theme-toggle:hover {
+	transform: translateY(-2px) rotate(60deg);
+}
+
+/* ── 焦点 / 选中 ─────────────────────────────────────────────── */
+:where(a, button, input, textarea, summary, [tabindex]):focus-visible {
+	outline: 2px solid var(--accent-deep);
+	outline-offset: 3px;
+	border-radius: 4px;
+}
+
+::selection {
+	background: var(--accent-wash);
+	color: var(--ink);
+}
+
+/* ── 通用进场 ────────────────────────────────────────────────── */
+@keyframes fade-up {
+	from { opacity: 0; transform: translate3d(0, 1.1rem, 0); }
+	to { opacity: 1; transform: none; }
+}
+
+/* ── 减少动态效果 ─────────────────────────────────────────────
+   进场动画普遍带 backwards 填充，漏掉任何一个都会让元素停在 opacity:0，
+   所以这里一律关掉，而不是逐个列举 */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation: none !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}

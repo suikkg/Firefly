@@ -4,10 +4,17 @@ import { getPostUrlBySlug } from "@utils/url-utils";
 import PostCard from "@/components/layout/PostCard.astro";
 import { siteConfig } from "@/config";
 
-const { page } = Astro.props;
+const { page, urlPrefix = "" } = Astro.props as {
+	page: { data: PostEntry[]; total: number; size: number };
+	/** 旧版界面传 "/classic"，让卡片链到旧版文章页而不是新版 */
+	urlPrefix?: string;
+};
 
 let delay = 0;
 const interval = 50;
+
+// 首屏大致能放下的卡片数量——超出的部分改用滚动进场
+const ABOVE_FOLD_COUNT = 4;
 
 // 类型别名避免Fragment语法问题
 type PostEntry = CollectionEntry<"posts">;
@@ -43,15 +50,24 @@ const initialLayoutClass =
         category={entry.data.category}
         published={entry.data.published}
         updated={entry.data.updated}
-        url={getPostUrlBySlug(entry.id)}
+        url={`${urlPrefix}${getPostUrlBySlug(entry.id)}`}
         image={entry.data.image}
         description={entry.data.description}
         draft={entry.data.draft}
         pinned={entry.data.pinned}
         password={!!entry.data.password}
         loading={index < 2 ? "eager" : "lazy"}
-        class:list="onload-animation post-card-item"
-        style={`animation-delay: calc(var(--content-delay) + ${delay++ * interval}ms);`}
+        class:list={[
+          "post-card-item",
+          // 首屏内的卡片沿用加载动画；其余交给滚动进场，
+          // 避免几十张卡片在页面加载瞬间「在看不见的地方」把动画播完
+          index < ABOVE_FOLD_COUNT ? "onload-animation" : "reveal-ready",
+        ]}
+        style={
+          index < ABOVE_FOLD_COUNT
+            ? `animation-delay: calc(var(--content-delay) + ${delay++ * interval}ms);`
+            : ""
+        }
       />
     ))
   }

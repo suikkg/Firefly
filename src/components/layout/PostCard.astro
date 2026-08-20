@@ -123,7 +123,7 @@ const minutes = remarkPluginFrontmatter.minutes;
         password && (
           <Icon
             is:inline
-            name="material-symbols:lock-outline"
+            name="lucide:lock"
             class="inline text-2xl align-middle -translate-y-px"
           />
         )
@@ -169,7 +169,7 @@ const minutes = remarkPluginFrontmatter.minutes;
             aria-label={`View all posts with the ${tag.trim()} tag`}
             class="transition text-xs font-medium px-2.5 py-1 rounded-full
               bg-black/5 dark:bg-white/10 text-neutral-500 dark:text-neutral-400
-              hover:bg-(--btn-regular-bg) hover:text-(--btn-content)"
+              hover:bg-(--btn-regular-bg) hover:text-(--btn-content) hover:-translate-y-0.5"
           >
             #{tag.trim()}
           </a>
@@ -209,7 +209,7 @@ const minutes = remarkPluginFrontmatter.minutes;
         <div class="absolute pointer-events-none z-20 w-full h-full flex items-center justify-center ">
           <Icon
             is:inline
-            name="material-symbols:chevron-right-rounded"
+            name="lucide:chevron-right"
             class="transition opacity-0 group-hover:opacity-100 scale-50 group-hover:scale-100 text-white text-5xl"
           />
         </div>
@@ -217,8 +217,7 @@ const minutes = remarkPluginFrontmatter.minutes;
           src={processedImage}
           basePath={getFileDirFromPath(entry.filePath || "")}
           alt="Cover Image of the Post"
-          class="w-full h-full transition-transform duration-300 group-hover:scale-110 group-active:scale-115"
-          preview={true}
+          class="w-full h-full transition-transform duration-500 ease-out group-hover:scale-110 group-active:scale-115"
           loading={loading}
           apiUrls={apiUrls}
         />
@@ -240,7 +239,7 @@ const minutes = remarkPluginFrontmatter.minutes;
       >
         <Icon
           is:inline
-          name="material-symbols:chevron-right-rounded"
+          name="lucide:chevron-right"
           class="transition text-(--primary) text-4xl mx-auto"
         />
       </a>
@@ -249,6 +248,48 @@ const minutes = remarkPluginFrontmatter.minutes;
 </div>
 
 <style define:vars={{ coverWidth, descriptionClampLines }}>
+  /* 卡片 hover：抬升 + 阴影加深，走弹性曲线收尾；
+     色彩过渡单独保留较短时长，以免主题切换时整块卡片「飘」一下 */
+  .post-card-wrapper {
+    transition:
+      transform var(--motion-base) var(--spring-smooth),
+      box-shadow var(--motion-base) var(--spring-smooth),
+      color 0.15s,
+      background-color 0.15s,
+      border-color 0.15s;
+  }
+
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .post-card-wrapper:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--elevation-2);
+    }
+
+    .post-card-wrapper:active {
+      transform: translateY(-1px) scale(0.995);
+      transition-duration: var(--motion-instant);
+    }
+  }
+
+  /* 标题左侧色条：hover 时纵向生长，是卡片上唯一带回弹的元素 */
+  .post-card-title::before {
+    transition: transform var(--motion-base) var(--spring-snappy);
+    transform-origin: center;
+  }
+
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .post-card-wrapper:hover .post-card-title::before {
+      transform: scaleY(1.5);
+    }
+  }
+
+  /* 封面图：随卡片一起响应，比卡片本身慢一拍，形成层次 */
+  @media (prefers-reduced-motion: reduce) {
+    .post-card-wrapper :global(img) {
+      transition: none !important;
+    }
+  }
+
   .description-clamped {
     display: -webkit-box;
     -webkit-box-orient: vertical;

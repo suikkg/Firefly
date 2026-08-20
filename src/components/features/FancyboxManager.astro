@@ -1,12 +1,60 @@
 ---
-import "@fancyapps/ui/dist/fancybox/fancybox.css";
-import "@/styles/fancybox-custom.css";
 // Fancybox 管理器组件
+// 灯箱 CSS 约 33KB。静态 import 会被打进 Layout 的全局样式表，动态 import() 虽然
+// 能拆成独立文件，但 Vite 仍会在 <head> 里插入阻塞渲染的 <link>。
+// 这里改成用 ?url 只取产物地址，真正需要开灯箱时再把 <link> 插进 DOM。
+import fancyboxCss from "@fancyapps/ui/dist/fancybox/fancybox.css?url";
+import fancyboxCustomCss from "@/styles/fancybox-custom.css?url";
 ---
 
+<!-- 样式地址走 data 属性传给脚本：用 define:vars 会让这段脚本变成内联脚本，
+     TypeScript 就不再被编译了 -->
+<div
+  id="fancybox-style-src"
+  hidden
+  data-fancybox-style-src={fancyboxCss}
+  data-fancybox-style-custom={fancyboxCustomCss}
+></div>
+
 <script>
+  function fancyboxStyleHrefs(): string[] {
+    const el = document.getElementById("fancybox-style-src");
+    if (!el) return [];
+    return [el.dataset.fancyboxStyleSrc, el.dataset.fancyboxStyleCustom].filter(
+      (href): href is string => typeof href === "string" && href.length > 0,
+    );
+  }
+
+  let stylesRequested = false;
+
+  /** 把灯箱样式插入 <head>，并等它们真正生效再继续，避免首帧无样式闪烁 */
+  async function loadFancyboxStyles(): Promise<void> {
+    if (stylesRequested) return;
+    stylesRequested = true;
+
+    await Promise.all(
+      fancyboxStyleHrefs().map(
+        (href) =>
+          new Promise<void>((resolve) => {
+            if (document.querySelector(`link[data-fancybox-style][href="${href}"]`)) {
+              resolve();
+              return;
+            }
+            const link = document.createElement("link");
+            link.rel = "stylesheet";
+            link.href = href;
+            link.dataset.fancyboxStyle = "";
+            // 样式取不到也不该卡住灯箱，失败一样放行
+            link.addEventListener("load", () => resolve(), { once: true });
+            link.addEventListener("error", () => resolve(), { once: true });
+            document.head.appendChild(link);
+          }),
+      ),
+    );
+  }
+
   let Fancybox: any;
-  const IMG_SELECTOR = ".custom-md img:not(.card-wiki-link img), #post-cover img, .moment-images img";
+  const IMG_SELECTOR = ".custom-md img:not(.card-wiki-link img), .lab-prose img, #post-cover img, .moment-images img";
   const LINK_SELECTOR = ".moment-images a[data-fancybox], [data-fancybox]:not(.moment-images a)";
   const svgBlobUrlCache = new Map<string, string>();
 
@@ -144,7 +192,11 @@ import "@/styles/fancybox-custom.css";
     if (!document.querySelector(IMG_SELECTOR) && !document.querySelector(LINK_SELECTOR)) return;
 
     if (!Fancybox) {
-      const mod = await import("@fancyapps/ui");
+      // 页面上确实存在可放大的图片时，才去取灯箱的脚本与样式
+      const [mod] = await Promise.all([
+        import("@fancyapps/ui"),
+        loadFancyboxStyles(),
+      ]);
       Fancybox = mod.Fancybox;
     }
 

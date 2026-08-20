@@ -1,0 +1,279 @@
+/* ==========================================================================
+   Design System — 排版尺度 / 运动曲线 / 交互细节
+   --------------------------------------------------------------------------
+   这一层只做「设计语言」的统一，不改变任何布局结构与功能开关。
+   所有动效都受 prefers-reduced-motion 保护。
+   ========================================================================== */
+
+:root {
+	/* ── 弹性运动曲线 ───────────────────────────────────────────────
+	   用 linear() 描述真实的阻尼弹簧，而不是 cubic-bezier 的近似。
+	   spring-smooth：无过冲，用于尺寸/位置的常规变化
+	   spring-snappy：轻微过冲，用于 hover、按压等即时反馈
+	   spring-bouncy：明显回弹，仅用于强调元素，克制使用 */
+	--spring-smooth: linear(
+		0, 0.0033, 0.0132, 0.0505, 0.1078, 0.1817 22.1%, 0.3679 31.4%,
+		0.5555, 0.7112, 0.8299, 0.9147 60.3%, 0.9694, 1.0018 71.4%,
+		1.0173 76.3%, 1.0208 83.9%, 1.0134, 1.0031 96.1%, 1
+	);
+	--spring-snappy: linear(
+		0, 0.0088, 0.0344, 0.1223 12.5%, 0.3363 21.5%, 0.5751 29.9%,
+		0.7712, 0.9096 43.4%, 0.9905 48.9%, 1.0325 54.5%, 1.0483 61.4%,
+		1.0417 69.3%, 1.0234 78.1%, 1.0057 89%, 1
+	);
+	--spring-bouncy: linear(
+		0, 0.0156, 0.0625, 0.1406, 0.25 25%, 0.5625, 0.7656, 0.8906,
+		0.9531 50%, 1.0156, 1.0469, 1.0547, 1.0391 75%, 1.0156, 1.0039,
+		0.9961, 0.9922 87.5%, 1
+	);
+
+	/* 语义化时长：动画距离越大、时间越长，视觉上才成立 */
+	--motion-instant: 90ms;
+	--motion-quick: 180ms;
+	--motion-base: 280ms;
+	--motion-slow: 460ms;
+	--motion-deliberate: 720ms;
+
+	/* ── 流体字号阶梯 ───────────────────────────────────────────────
+	   375px → 1440px 之间线性插值，去掉断点处的字号跳变。
+	   比例：小屏 1.2，大屏 1.25。 */
+	--type--2: clamp(0.694rem, 0.68rem + 0.06vw, 0.72rem);
+	--type--1: clamp(0.833rem, 0.81rem + 0.1vw, 0.9rem);
+	--type-0: clamp(1rem, 0.97rem + 0.14vw, 1.125rem);
+	--type-1: clamp(1.2rem, 1.15rem + 0.24vw, 1.406rem);
+	--type-2: clamp(1.44rem, 1.35rem + 0.4vw, 1.758rem);
+	--type-3: clamp(1.728rem, 1.58rem + 0.63vw, 2.197rem);
+	--type-4: clamp(2.074rem, 1.85rem + 0.96vw, 2.747rem);
+	--type-5: clamp(2.488rem, 2.14rem + 1.45vw, 3.433rem);
+	--type-6: clamp(2.986rem, 2.47rem + 2.14vw, 4.292rem);
+
+	/* ── 光学字距 ───────────────────────────────────────────────────
+	   字号越大，字距越紧，视觉密度才均匀；小字反之需要放开。 */
+	--tracking-display: -0.028em;
+	--tracking-title: -0.018em;
+	--tracking-body: 0.012em; /* CJK 正文略放开，缓解方块字拥挤 */
+	--tracking-meta: 0.02em;
+	--tracking-caps: 0.08em;
+
+	/* ── 层次化阴影 ─────────────────────────────────────────────────
+	   双层结构：近处小而实的接触阴影 + 远处大而虚的环境阴影。 */
+	--elevation-1: 0 1px 2px -1px rgb(0 0 0 / 0.06), 0 2px 8px -2px rgb(0 0 0 / 0.06);
+	--elevation-2: 0 2px 4px -2px rgb(0 0 0 / 0.08), 0 8px 24px -6px rgb(0 0 0 / 0.1);
+	--elevation-3: 0 4px 8px -4px rgb(0 0 0 / 0.1), 0 16px 40px -8px rgb(0 0 0 / 0.14);
+}
+
+:root.dark {
+	/* 暗色下环境光更弱，阴影要更深、扩散更大才看得出层次 */
+	--elevation-1: 0 1px 2px -1px rgb(0 0 0 / 0.4), 0 2px 8px -2px rgb(0 0 0 / 0.36);
+	--elevation-2: 0 2px 4px -2px rgb(0 0 0 / 0.5), 0 8px 24px -6px rgb(0 0 0 / 0.45);
+	--elevation-3: 0 4px 8px -4px rgb(0 0 0 / 0.55), 0 16px 40px -8px rgb(0 0 0 / 0.5);
+}
+
+/* ==========================================================================
+   1. 正文排版
+   ========================================================================== */
+
+/* 数字统一等宽，避免计数跳动时元素宽度抖动 */
+.post-meta,
+.post-stats,
+.banner-post-meta-list,
+[class*="tabular"],
+time {
+	font-variant-numeric: tabular-nums;
+}
+
+/* 标题避免出现「孤字成行」，段落收尾更平整 */
+h1,
+h2,
+h3,
+h4,
+.post-card-title,
+.banner-title,
+.banner-post-title,
+.banner-page-title {
+	text-wrap: balance;
+}
+
+.custom-md p,
+.post-card-description {
+	text-wrap: pretty;
+}
+
+/* 大标题收紧字距 */
+.post-card-title {
+	font-size: var(--type-3);
+	letter-spacing: var(--tracking-title);
+}
+
+.custom-md h1 {
+	font-size: var(--type-4);
+	letter-spacing: var(--tracking-title);
+}
+.custom-md h2 {
+	font-size: var(--type-3);
+	letter-spacing: var(--tracking-title);
+}
+.custom-md h3 {
+	font-size: var(--type-2);
+	letter-spacing: var(--tracking-title);
+}
+.custom-md h4 {
+	font-size: var(--type-1);
+}
+
+/* ==========================================================================
+   2. Banner 展示级排版
+   ========================================================================== */
+
+.banner-title {
+	/* 下限抬高、上限仍尊重配置值，中间用视口宽度平滑过渡 */
+	font-size: clamp(2rem, 7.2vw, var(--banner-title-size, 3rem));
+	letter-spacing: var(--tracking-display);
+	/* 单层重模糊会糊成一团，改成「近实 + 远虚」两层，字形边缘更利落 */
+	text-shadow:
+		0 1px 2px rgb(0 0 0 / 0.35),
+		0 8px 32px rgb(0 0 0 / 0.45);
+}
+
+.banner-subtitle {
+	letter-spacing: 0.005em;
+	text-shadow:
+		0 1px 2px rgb(0 0 0 / 0.3),
+		0 6px 24px rgb(0 0 0 / 0.4);
+}
+
+.banner-post-title {
+	font-size: clamp(1.75rem, 4.2vw, 2.75rem);
+	letter-spacing: var(--tracking-display);
+	text-shadow:
+		0 1px 2px rgb(0 0 0 / 0.4),
+		0 8px 32px rgb(0 0 0 / 0.5);
+}
+
+.banner-page-title {
+	letter-spacing: var(--tracking-display);
+	text-shadow:
+		0 1px 2px rgb(0 0 0 / 0.4),
+		0 8px 32px rgb(0 0 0 / 0.5);
+}
+
+/* Banner 文案进场：标题先起、副标题跟上，形成先后关系而不是一起闪出来。
+   纯 CSS 实现，不依赖 JS，swup 导航后重新渲染时会自然重播。 */
+@media (prefers-reduced-motion: no-preference) {
+	.banner-home-text-overlay:not(.hidden) .banner-title,
+	.banner-home-text-overlay:not(.hidden) .banner-subtitle,
+	.banner-post-meta-overlay .banner-post-title,
+	.banner-page-title-overlay .banner-page-title {
+		animation: banner-rise var(--motion-deliberate) var(--spring-smooth) backwards;
+	}
+
+	.banner-home-text-overlay:not(.hidden) .banner-title,
+	.banner-post-meta-overlay .banner-post-title,
+	.banner-page-title-overlay .banner-page-title {
+		animation-delay: 80ms;
+	}
+
+	.banner-home-text-overlay:not(.hidden) .banner-subtitle {
+		animation-delay: 220ms;
+	}
+}
+
+@keyframes banner-rise {
+	from {
+		opacity: 0;
+		/* 轻微放大配合上浮，读起来像镜头推近，而不是元素被推上来 */
+		transform: translate3d(0, 0.5em, 0) scale(0.985);
+		filter: blur(6px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+		filter: none;
+	}
+}
+
+/* ==========================================================================
+   3. 交互反馈
+   ========================================================================== */
+
+/* 键盘焦点环：统一样式，鼠标点击不显示 */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 3px;
+	border-radius: var(--radius-md, 0.375rem);
+}
+
+::selection {
+	background-color: var(--selection-bg);
+}
+
+/* 卡片：hover 时抬升，用弹性曲线收尾 */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+	.card-base,
+	.card-base-transparent {
+		transition:
+			transform var(--motion-base) var(--spring-smooth),
+			box-shadow var(--motion-base) var(--spring-smooth),
+			background-color var(--duration-normal, 150ms) var(--ease-standard),
+			border-color var(--duration-normal, 150ms) var(--ease-standard);
+	}
+}
+
+/* 正文链接：下划线由左向右展开，而不是整条直接出现 */
+.custom-md a:not(.no-underline-effect):not([class*="card-"]) {
+	background-image: linear-gradient(var(--primary), var(--primary));
+	background-repeat: no-repeat;
+	background-position: 0 100%;
+	background-size: 0 1.5px;
+	text-decoration: none;
+	transition: background-size var(--motion-quick) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.custom-md a:not(.no-underline-effect):not([class*="card-"]):hover {
+		background-size: 100% 1.5px;
+	}
+}
+
+/* ==========================================================================
+   4. 滚动进场
+   --------------------------------------------------------------------------
+   由 scroll-reveal 脚本加 .reveal-ready / .is-revealed 两个类驱动。
+   脚本未生效（禁用 JS）时元素保持默认可见，不会白屏。
+   ========================================================================== */
+
+@media (prefers-reduced-motion: no-preference) {
+	.reveal-ready {
+		opacity: 0;
+		transform: translate3d(0, 14px, 0);
+		transition:
+			opacity var(--motion-slow) var(--ease-decelerate),
+			transform var(--motion-slow) var(--spring-smooth);
+		transition-delay: var(--reveal-delay, 0ms);
+	}
+
+	.reveal-ready.is-revealed {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* ==========================================================================
+   5. 减少动态效果
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+	.reveal-ready {
+		opacity: 1;
+		transform: none;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}

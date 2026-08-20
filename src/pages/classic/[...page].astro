@@ -18,8 +18,8 @@ const { page } = Astro.props;
 const len = page.data.length;
 ---
 
-<MainGridLayout>
-  <PostPage page={page} />
+<MainGridLayout noindex={true}>
+  <PostPage page={page} urlPrefix="/classic" />
   {
     page.total > page.size && (
       <Pagination

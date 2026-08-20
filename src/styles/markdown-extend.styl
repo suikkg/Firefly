@@ -1,4 +1,33 @@
 .custom-md
+  // ─── 正文排版精修 ───
+  // 中文排版字距微调，缓解 CJK 字符拥挤感
+  letter-spacing: 0.012em
+
+  // 段落行高略增，提升长文可读性
+  p
+    line-height: 1.85
+
+  // 列表项呼吸感
+  li
+    line-height: 1.8
+
+  li + li
+    margin-top: 0.35em
+
+  // 标题节奏：上方留白大于下方，形成清晰的视觉分组
+  h2
+    margin-top: 2.2em
+    margin-bottom: 0.85em
+    padding-bottom: 0.35em
+    border-bottom: 1px solid var(--line-divider)
+
+  h3
+    margin-top: 1.8em
+    margin-bottom: 0.7em
+
+  h4, h5, h6
+    margin-top: 1.5em
+    margin-bottom: 0.6em
 
   blockquote.admonition
     .bdm-title
@@ -73,6 +102,11 @@
 
   img
     border-radius: 0.75rem
+    // 轻阴影让图片从卡片背景中浮起，暗色下用更深的阴影
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06)
+
+  :root.dark & img
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35)
 
   hr
     border-color: var(--line-divider)

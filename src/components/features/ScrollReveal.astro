@@ -1,0 +1,88 @@
+---
+// 滚动进场
+// 只处理带 .reveal-ready 的元素；样式（.reveal-ready / .is-revealed）定义在
+// design-system.css 里。脚本不执行时元素依然可见，不存在白屏风险。
+---
+
+<!-- 禁用 JS 时观察器不会运行，这里把待揭示的元素直接还原为可见，
+     否则整屏卡片会停在 opacity:0 -->
+<noscript>
+	<style>
+		.reveal-ready {
+			opacity: 1 !important;
+			transform: none !important;
+		}
+	</style>
+</noscript>
+
+<script>
+	// 用类名而不是 data 属性做选择器：像 PostCard 这类组件只透传 class，
+	// 自定义属性会被丢掉
+	const REVEAL_SELECTOR = ".reveal-ready:not(.is-revealed)";
+	const STAGGER_MS = 70;
+	const MAX_STAGGER_STEPS = 5;
+
+	let observer: IntersectionObserver | null = null;
+
+	function revealAll(): void {
+		for (const el of document.querySelectorAll<HTMLElement>(REVEAL_SELECTOR)) {
+			el.classList.add("is-revealed");
+		}
+	}
+
+	function setup(): void {
+		// 用户要求减少动态效果时，直接全部呈现
+		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+			revealAll();
+			return;
+		}
+
+		if (!("IntersectionObserver" in window)) {
+			revealAll();
+			return;
+		}
+
+		observer?.disconnect();
+
+		// 同一批进入视口的元素依次亮相，形成节奏；批次之间重新计数，
+		// 否则滚到页面深处时延迟会累积成肉眼可见的卡顿
+		let batchIndex = 0;
+		let batchTimer: number | undefined;
+
+		observer = new IntersectionObserver(
+			(entries, obs) => {
+				for (const entry of entries) {
+					if (!entry.isIntersecting) continue;
+					const el = entry.target as HTMLElement;
+					el.style.setProperty(
+						"--reveal-delay",
+						`${Math.min(batchIndex, MAX_STAGGER_STEPS) * STAGGER_MS}ms`,
+					);
+					el.classList.add("is-revealed");
+					obs.unobserve(el);
+					batchIndex++;
+
+					window.clearTimeout(batchTimer);
+					batchTimer = window.setTimeout(() => {
+						batchIndex = 0;
+					}, 160);
+				}
+			},
+			// 提前一点触发，元素滚进视野时动画已经在进行中
+			{ rootMargin: "0px 0px -8% 0px", threshold: 0.01 },
+		);
+
+		for (const el of document.querySelectorAll<HTMLElement>(REVEAL_SELECTOR)) {
+			observer.observe(el);
+		}
+	}
+
+	setup();
+
+	// swup 替换内容后重新绑定
+	document.addEventListener("swup:content:replace", setup);
+	// 从 bfcache 返回时，元素可能停在未揭示状态
+	window.addEventListener("pageshow", (e) => {
+		if ((e as PageTransitionEvent).persisted) revealAll();
+	});
+</script>
