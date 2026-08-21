@@ -1,104 +1,101 @@
 ---
+// 音乐：YouTube 歌单嵌入
 import { Icon } from "astro-icon/components";
-import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import LabPage from "@/layouts/LabPage.astro";
 
-// ============================================================
-// YouTube 音乐歌单页面（方案A）
-// 访客可自行登录自己的 YouTube 账号（Premium 会员则无广告）
-//
-// 支持多个歌单，每个歌单一个嵌入播放器
-// 歌单 ID 获取方法：
-//   YouTube 打开歌单 -> 地址栏 URL 中 list= 后面的参数
-//   例如 https://www.youtube.com/playlist?list=PLxxxxxxxxxx
-//   则填入 "PLxxxxxxxxxx"
-// ============================================================
+// 歌单 ID 取法：YouTube 打开歌单 → 地址栏 list= 后面的参数
 const YOUTUBE_PLAYLISTS = [
-	{
-		name: "粤语经典 歌单一",
-		id: "PLDX7UghaEhS3tozBn2fQvxv9emsBO3Fd8",
-	},
-	{
-		name: "粤语经典 歌单二",
-		id: "PLLlhPNUoErKZ9j6QEWn1NvGzuQsXX6LUt",
-	},
+	{ name: "粤语经典 歌单一", id: "PLDX7UghaEhS3tozBn2fQvxv9emsBO3Fd8" },
+	{ name: "粤语经典 歌单二", id: "PLbdmiTuJcvXqiaN0oQVSXCUsF7DIapKhg" },
 ];
 
-const title = "音乐";
-const description = "YouTube 歌单播放，登录你的 YouTube 账号可无广告完整播放";
+const description = "在线歌单，登录 YouTube 账号后可无广告完整播放。";
 ---
 
-<MainGridLayout title={title} description={description}>
-  <div
-    class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-32"
-  >
-    <div class="card-base z-10 px-9 py-6 relative w-full">
-      <!-- 页面标题和描述 -->
-      <div class="mb-4">
-        <div class="flex items-center gap-3 mb-3">
-          <div
-            class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70"
-          >
-            <Icon is:inline name="lucide:music" class="text-[1.5rem]" />
-          </div>
-          <div class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">
-            {title}
-          </div>
-        </div>
-        <p class="text-base text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
-          {description}
-        </p>
-      </div>
+<LabPage title="音乐" description={description} lede={description}>
+	{
+		YOUTUBE_PLAYLISTS.length > 0 ? (
+			<div class="lists">
+				{YOUTUBE_PLAYLISTS.map((pl) => (
+					<section class="list">
+						<h2 class="list-name">
+							<Icon is:inline name="lucide:list-music" />
+							{pl.name}
+						</h2>
+						<div class="frame card">
+							<iframe
+								src={`https://www.youtube.com/embed/videoseries?list=${pl.id}`}
+								title={pl.name}
+								loading="lazy"
+								allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+								allowfullscreen
+							/>
+						</div>
+					</section>
+				))}
+			</div>
+		) : (
+			<p class="empty">
+				<Icon is:inline name="lucide:music" />
+				还没有配置歌单
+			</p>
+		)
+	}
 
-      {
-        YOUTUBE_PLAYLISTS.length > 0 ? (
-          <div class="space-y-8">
-            {YOUTUBE_PLAYLISTS.map((playlist) => (
-              <div>
-                <h3 class="mb-3 flex items-center gap-2 text-lg font-bold text-neutral-800 dark:text-neutral-100">
-                  <Icon is:inline name="lucide:list-music" class="shrink-0 text-(--primary)" />
-                  {playlist.name}
-                </h3>
-                <p class="mb-3 flex items-start gap-2 text-sm text-neutral-500 dark:text-neutral-400">
-                  <Icon is:inline name="lucide:headphones" class="mt-0.5 shrink-0" />
-                  <span>
-                    提示：登录你的 YouTube 账号（Premium 会员）后可无广告完整播放；
-                    未登录时部分歌曲可能插播广告。
-                  </span>
-                </p>
-                <div class="overflow-hidden rounded-xl bg-black/5 dark:bg-white/5">
-                  <iframe
-                    src={`https://www.youtube.com/embed/videoseries?list=${playlist.id}`}
-                    class="h-[480px] w-full border-0"
-                    title={playlist.name}
-                    loading="lazy"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowfullscreen
-                  ></iframe>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div class="py-12 text-center">
-            <p class="flex items-center justify-center gap-2 text-lg text-neutral-700 dark:text-neutral-200">
-              <Icon is:inline name="lucide:music" class="shrink-0 text-(--primary)" />
-              音乐页面即将上线
-            </p>
-            <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-              请先在 <code>src/pages/music.astro</code> 中填入你的 YouTube 歌单 ID
-            </p>
-          </div>
-        )
-      }
+	<div class="notes">
+		<p>
+			<Icon is:inline name="lucide:headphones" />
+			<span>登录你的 YouTube 账号（Premium 会员）后可无广告完整播放；未登录时部分歌曲可能插播广告。</span>
+		</p>
+		<p>
+			<Icon is:inline name="lucide:radio" />
+			<span>侧边栏的音乐播放器播放本地音乐，无需登录、没有广告，歌曲在 <code>src/config/musicConfig.ts</code> 中配置。</span>
+		</p>
+	</div>
+</LabPage>
 
-      <!-- 本地音乐说明 -->
-      <div class="mt-6 flex items-start gap-2 rounded-xl border border-neutral-200 dark:border-neutral-700 p-4 text-sm text-neutral-500 dark:text-neutral-400">
-        <Icon is:inline name="lucide:radio" class="mt-0.5 shrink-0" />
-        <span>
-          侧边栏的音乐播放器播放本地音乐（无需登录，无广告），
-          如需调整歌曲请修改 <code>src/config/musicConfig.ts</code> 的本地播放列表。
-        </span>
-      </div>
-    </div>
-  </div>
-</MainGridLayout>
+<style>
+	.lists { display: grid; gap: clamp(1.5rem, 4vw, 2.5rem); }
+
+	.list-name {
+		display: flex; align-items: center; gap: 0.55rem;
+		margin: 0 0 0.85rem;
+		font-size: 1.15rem; font-weight: 650; letter-spacing: -0.015em;
+	}
+	.list-name :global(svg) { color: var(--accent-deep); }
+
+	.frame { overflow: hidden; }
+
+	.frame :global(iframe) {
+		display: block;
+		width: 100%;
+		aspect-ratio: 16 / 9;
+		min-height: 320px;
+		border: 0;
+	}
+
+	.notes {
+		display: grid; gap: 0.85rem;
+		max-width: var(--measure);
+		margin-top: clamp(2rem, 5vw, 3rem);
+		padding-top: 1.5rem;
+		border-top: 1px solid var(--hair);
+	}
+
+	.notes p {
+		display: flex; align-items: flex-start; gap: 0.6rem;
+		margin: 0; font-size: 0.88rem; line-height: 1.7; color: var(--ink-soft);
+	}
+
+	.notes :global(svg) { margin-top: 0.25rem; flex-shrink: 0; color: var(--accent-deep); }
+
+	.notes :global(code) {
+		font-family: var(--mono); font-size: 0.85em;
+		padding: 0.1em 0.35em; border-radius: 3px; background: var(--accent-wash);
+	}
+
+	.empty {
+		display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+		padding: 3.5rem 1rem; color: var(--ink-soft);
+	}
+</style>

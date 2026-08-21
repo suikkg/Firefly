@@ -6,7 +6,8 @@ import AnimeGrid from "@/components/pages/anime/AnimeGrid.svelte";
 import { siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import LabPage from "@/layouts/LabPage.astro";
+import "@/styles/lab-compat.css";
 import type { StandardizedAnime } from "@/types/anime";
 import { formatDateI18nWithTime } from "@/utils/date-utils";
 
@@ -247,7 +248,7 @@ const bilibiliAverageRating =
 const isConfigured = !!(BILIBILI_UID || (TMDB_API_KEY && TMDB_LIST_ID));
 ---
 
-<MainGridLayout title={i18n(I18nKey.anime)} description={i18n(I18nKey.animeSubtitle)}>
+<LabPage title={i18n(I18nKey.anime)} description={i18n(I18nKey.animeSubtitle)}>
   <div class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-32">
     <div class="card-base z-10 px-4 sm:px-6 md:px-9 py-4 sm:py-6 relative w-full">
       <!-- 页面标题 -->
@@ -345,4 +346,4 @@ const isConfigured = !!(BILIBILI_UID || (TMDB_API_KEY && TMDB_LIST_ID));
       </div>
     </div>
   </div>
-</MainGridLayout>
+</LabPage>

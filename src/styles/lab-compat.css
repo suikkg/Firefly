@@ -1,0 +1,59 @@
+/* ==========================================================================
+   Tailwind 兼容层
+   --------------------------------------------------------------------------
+   番剧 / 追番 / 动态这几页的内容由既有组件渲染，那些组件通篇是 Tailwind
+   工具类。新版界面本身不引 Tailwind，直接套用会导致布局塌陷。
+
+   这里只引 theme（变量）与 utilities（工具类），**不引 preflight**：
+   preflight 是全局重置，会与 lab.css 的排版打架。
+   工具类由 Vite 插件按实际用到的类名生成，不会把整套工具类都打进来。
+   ========================================================================== */
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* 主题用 class 切换暗色，需要显式声明该变体 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── 旧主题变量桥接 ────────────────────────────────────────────
+   dynamic.css 等既有样式表引用的是旧主题的变量名。这里把它们映射到
+   新版调色板上，既有样式就能直接在新版界面里正常显示，不必逐一改写。 */
+:root {
+	--primary: var(--accent);
+	--card-bg: var(--card);
+	--card-bg-transparent: var(--card-soft);
+	--btn-regular-bg: var(--accent-wash);
+	--btn-regular-bg-hover: color-mix(in oklch, var(--accent) 22%, transparent);
+	--btn-content: var(--accent-deep);
+	--line-divider: var(--hair);
+	--line-color: var(--hair);
+	--content-meta: var(--ink-soft);
+	--deep-text: var(--ink);
+	--radius-large: var(--radius);
+	--float-panel-bg: var(--card);
+	--enter-btn-bg: var(--accent-wash);
+	--enter-btn-bg-hover: color-mix(in oklch, var(--accent) 22%, transparent);
+}
+
+/* 旧主题的卡片基类，被不少既有组件直接引用 */
+.card-base {
+	background: var(--card);
+	border-radius: var(--radius);
+	box-shadow: var(--lift-1);
+	overflow: hidden;
+}
+
+.btn-regular {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--accent-wash);
+	color: var(--accent-deep);
+	border: 0;
+	cursor: pointer;
+	transition: background-color 0.3s var(--ease-out);
+}
+
+.btn-regular:hover {
+	background: color-mix(in oklch, var(--accent) 22%, transparent);
+}

@@ -4,7 +4,8 @@ import BangumiGrid from "@/components/pages/bangumi/BangumiGrid.svelte";
 import { siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import LabPage from "@/layouts/LabPage.astro";
+import "@/styles/lab-compat.css";
 import type {
 	UserSubjectCollection,
 	UserSubjectCollectionResponse,
@@ -203,7 +204,7 @@ if (!isDynamic) {
 const activeTab = tabs[0]?.id || "anime";
 ---
 
-<MainGridLayout title={i18n(I18nKey.bangumi)} description={i18n(I18nKey.bangumiSubtitle)}>
+<LabPage title={i18n(I18nKey.bangumi)} description={i18n(I18nKey.bangumiSubtitle)}>
   <div class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-32">
     <div class="card-base z-10 px-9 py-6 relative w-full">
         <!-- 页面标题 -->
@@ -293,7 +294,7 @@ const activeTab = tabs[0]?.id || "anime";
 		</div>
     </div>
   </div>
-</MainGridLayout>
+</LabPage>
 
 <style>
   /* 自定义样式 */

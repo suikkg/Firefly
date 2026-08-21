@@ -1,207 +1,167 @@
 ---
+// 相册总览：数据来自 galleryConfig + public/gallery 目录扫描
 import { Icon } from "astro-icon/components";
-import AlbumCard from "@/components/pages/gallery/AlbumCard.astro";
 import { galleryConfig, siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import LabPage from "@/layouts/LabPage.astro";
 import { getAlbumCover, scanAlbumPhotos } from "@/utils/gallery-utils";
+import { url } from "@/utils/url-utils";
 
-// 检查页面是否启用
 if (!siteConfig.pages.gallery) {
 	return Astro.redirect("/404/");
 }
 
-const title = i18n(I18nKey.gallery);
-const description = i18n(I18nKey.galleryDescription);
-
-// 构建相册数据（扫描照片、获取封面）
 const albums = galleryConfig.albums.map((album) => {
 	const photos = scanAlbumPhotos(album.id);
-	const cover = getAlbumCover(album, photos);
-	return { ...album, cover, photoCount: photos.length };
+	return {
+		...album,
+		cover: getAlbumCover(album, photos),
+		photoCount: photos.length,
+	};
 });
-
-// 收集所有标签用于筛选
 const allTags = [...new Set(albums.flatMap((a) => a.tags || []))].sort();
+
+const title = i18n(I18nKey.gallery);
+const description = i18n(I18nKey.galleryDescription);
 ---
 
-<MainGridLayout title={title} description={description}>
-  <div
-    class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-32"
-  >
-    <div class="card-base z-10 px-9 py-6 relative w-full">
-      <!-- 页面标题和描述 -->
-      <div class="mb-4">
-        <div class="flex items-center gap-3 mb-3">
-          <div
-            class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70"
-          >
-            <Icon is:inline name="lucide:images" class="text-[1.5rem]" />
-          </div>
-          <div class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">
-            {title}
-          </div>
-        </div>
-        {description && (
-          <p class="text-base text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
-            {description}
-          </p>
-        )}
-      </div>
+<LabPage title={title} description={description} lede={description}>
+	{
+		allTags.length > 0 && (
+			<div class="filter" role="group" aria-label="按标签筛选">
+				<button type="button" class="chip is-on" data-tag="">
+					全部 <span class="chip-n">{albums.length}</span>
+				</button>
+				{allTags.map((t) => (
+					<button type="button" class="chip" data-tag={t}>
+						{t}
+						<span class="chip-n">{albums.filter((a) => (a.tags || []).includes(t)).length}</span>
+					</button>
+				))}
+			</div>
+		)
+	}
 
-      <!-- 搜索框 + 标签筛选 -->
-      {albums.length > 0 && (
-        <gallery-filter class="mb-6">
-          <div class="relative mb-3">
-            <Icon is:inline
-              name="lucide:search"
-              class="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500 text-lg pointer-events-none"
-            />
-            <input
-              type="text"
-              data-search
-              placeholder={i18n(I18nKey.searchAlbums)}
-              class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-(--line-divider) bg-transparent text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:border-(--primary) focus:ring-1 focus:ring-(--primary) outline-none transition-all duration-200 text-sm"
-            />
-          </div>
-          {allTags.length > 0 && (
-            <div class="flex flex-wrap gap-2">
-              <button
-                data-tag="all"
-                class="category-pill px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-200"
-                data-active
-              >
-                {i18n(I18nKey.all)}
-              </button>
-              {allTags.map((tag) => (
-                <button
-                  data-tag={tag}
-                  class="category-pill px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-200"
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          )}
-        </gallery-filter>
-      )}
+	{
+		albums.length === 0 ? (
+			<p class="empty">还没有创建相册</p>
+		) : (
+			<div class="albums">
+				{albums.map((a) => (
+					<a
+						class="album card"
+						href={url(`/gallery/${a.id}/`)}
+						data-tags={JSON.stringify(a.tags || [])}
+					>
+						<div class="album-art" style={a.cover ? `background-image:url("${url(a.cover)}")` : ""}>
+							{a.password && (
+								<span class="lock" title="需要密码">
+									<Icon is:inline name="lucide:lock-keyhole" />
+								</span>
+							)}
+							<span class="count micro">{a.photoCount} 张</span>
+						</div>
+						<div class="album-body">
+							<h2 class="album-name">{a.name}</h2>
+							{a.description && <p class="album-desc">{a.description}</p>}
+							<div class="album-meta micro">
+								{a.date && <span>{a.date}</span>}
+								{a.location && (
+									<span class="loc">
+										<Icon is:inline name="lucide:map-pin" /> {a.location}
+									</span>
+								)}
+							</div>
+						</div>
+					</a>
+				))}
+			</div>
+		)
+	}
 
-      <!-- 相册卡片网格 -->
-      {albums.length > 0 ? (
-        <>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 my-4">
-            {albums.map((album) => (
-              <AlbumCard
-                id={album.id}
-                name={album.name}
-                cover={album.cover}
-                description={album.description}
-                date={album.date}
-                location={album.location}
-                tags={album.tags}
-                photoCount={album.photoCount}
-                encrypted={!!album.password}
-              />
-            ))}
-          </div>
-          {/* 搜索无结果提示 */}
-          <div class="albums-empty hidden flex-col items-center justify-center py-12 text-neutral-400 dark:text-neutral-500">
-            <Icon is:inline name="lucide:search-x" class="text-4xl mb-3" />
-            <div class="text-sm">{i18n(I18nKey.searchNoResults)}</div>
-          </div>
-        </>
-      ) : (
-        <div class="flex flex-col items-center justify-center py-16 text-neutral-400 dark:text-neutral-500">
-          <Icon is:inline name="lucide:images" class="text-6xl mb-4 opacity-50" />
-          <p class="text-lg">{i18n(I18nKey.galleryNoAlbums)}</p>
-        </div>
-      )}
-    </div>
-  </div>
+	<p class="empty" id="no-match" hidden>该标签下没有相册</p>
+</LabPage>
 
-  <script slot="head" is:inline>
-    if (!customElements.get("gallery-filter")) {
-      class GalleryFilter extends HTMLElement {
-        selectedTag = "all";
+<style>
+	.chip[hidden], .empty[hidden], .album[hidden] { display: none; }
 
-        constructor() {
-          super();
-        }
+	.filter { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
 
-        connectedCallback() {
-          this.addEventListener("click", this.handleClick);
-          const input = this.querySelector("[data-search]");
-          if (input) {
-            input.addEventListener("input", () => this.applyFilters());
-          }
-        }
+	.chip {
+		display: inline-flex; align-items: center; gap: 0.4rem;
+		padding: 0.45rem 0.9rem; border: 0; border-radius: 999px;
+		background: var(--card); box-shadow: var(--lift-1); color: var(--ink);
+		font-family: inherit; font-size: 0.82rem; cursor: pointer;
+		transition: background-color 0.3s var(--ease-out), color 0.3s var(--ease-out), transform 0.4s var(--spring);
+	}
+	.chip:hover { transform: translateY(-2px); }
+	.chip.is-on { background: var(--accent); color: #fff; }
+	.chip-n { font-family: var(--mono); font-size: 0.7em; opacity: 0.65; }
 
-        disconnectedCallback() {
-          this.removeEventListener("click", this.handleClick);
-        }
+	.albums {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+		gap: 1.15rem;
+	}
 
-        handleClick(e) {
-          const target = e.target;
-          const button = target.closest("button");
-          if (!button) return;
+	.album { display: flex; flex-direction: column; overflow: hidden; color: inherit; text-decoration: none; }
 
-          this.selectedTag = button.dataset.tag;
-          const filters = this.querySelectorAll("button");
+	.album-art {
+		position: relative;
+		aspect-ratio: 4 / 3;
+		background: var(--accent-wash) center / cover no-repeat;
+		transition: transform 0.9s var(--ease-out);
+	}
 
-          filters.forEach((f) => {
-            f.removeAttribute("data-active");
-          });
-          button.setAttribute("data-active", "");
+	.count, .lock {
+		position: absolute;
+		padding: 0.22rem 0.55rem;
+		border-radius: 999px;
+		background: rgb(255 255 255 / 0.86);
+		backdrop-filter: blur(8px);
+		color: var(--ink);
+	}
+	.count { right: 0.7rem; bottom: 0.7rem; letter-spacing: 0.08em; }
+	.lock { left: 0.7rem; top: 0.7rem; display: grid; place-items: center; padding: 0.35rem; }
 
-          this.applyFilters();
-        }
+	.album-body { display: flex; flex-direction: column; gap: 0.4rem; flex: 1; padding: 0.95rem 1.1rem 1.1rem; }
 
-        applyFilters() {
-          const container = this.closest(".card-base");
-          if (!container) return;
+	.album-name { margin: 0; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.015em; }
 
-          const input = this.querySelector("[data-search]");
-          const query = (input?.value || "").toLowerCase().trim();
-          const cards = container.querySelectorAll(".album-card");
+	.album-desc {
+		margin: 0; font-size: 0.84rem; line-height: 1.6; color: var(--ink-soft);
+		display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+	}
 
-          let hasVisible = false;
+	.album-meta { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: auto; padding-top: 0.6rem; border-top: 1px solid var(--hair); }
+	.loc { display: inline-flex; align-items: center; gap: 0.25rem; }
 
-          cards.forEach((card) => {
-            const cardEl = card;
-            const tags = (cardEl.dataset.tags || "").split(",");
-            const name = (cardEl.querySelector("h3")?.textContent || "").toLowerCase();
-            const desc = (cardEl.querySelector("p")?.textContent || "").toLowerCase();
-            const location = (cardEl.querySelector(".inline-flex")?.textContent || "").toLowerCase();
+	@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+		.album:hover { transform: translateY(-4px); box-shadow: var(--lift-3); }
+		.album:hover .album-art { transform: scale(1.04); }
+	}
 
-            const tagMatch =
-              this.selectedTag === "all" ||
-              (this.selectedTag && tags.includes(this.selectedTag));
-            const searchMatch =
-              !query ||
-              name.includes(query) ||
-              desc.includes(query) ||
-              location.includes(query) ||
-              tags.some((t) => t.toLowerCase().includes(query));
+	.empty { padding: 3.5rem 1rem; text-align: center; color: var(--ink-soft); }
+</style>
 
-            if (tagMatch && searchMatch) {
-              cardEl.style.display = "";
-              cardEl.classList.add("animate-fade-in-up");
-              hasVisible = true;
-            } else {
-              cardEl.style.display = "none";
-              cardEl.classList.remove("animate-fade-in-up");
-            }
-          });
+<script>
+	const chips = document.querySelectorAll<HTMLButtonElement>(".chip");
+	const cards = document.querySelectorAll<HTMLElement>(".album");
+	const noMatch = document.getElementById("no-match");
 
-          const emptyEl = container.querySelector(".albums-empty");
-          if (emptyEl) {
-            emptyEl.classList.toggle("hidden", hasVisible);
-            emptyEl.classList.toggle("flex", !hasVisible);
-          }
-        }
-      }
-      customElements.define("gallery-filter", GalleryFilter);
-    }
-  </script>
-</MainGridLayout>
+	for (const chip of chips) {
+		chip.addEventListener("click", () => {
+			const want = chip.dataset.tag || "";
+			for (const c of chips) c.classList.toggle("is-on", c === chip);
+			let shown = 0;
+			for (const card of cards) {
+				const tags: string[] = JSON.parse(card.dataset.tags || "[]");
+				const hit = !want || tags.includes(want);
+				card.hidden = !hit;
+				if (hit) shown++;
+			}
+			if (noMatch) noMatch.hidden = shown > 0;
+		});
+	}
+</script>

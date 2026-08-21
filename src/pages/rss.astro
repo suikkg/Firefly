@@ -1,5 +1,6 @@
 ---
-import MainGridLayout from "@layouts/MainGridLayout.astro";
+import LabPage from "@layouts/LabPage.astro";
+import "@/styles/lab-compat.css";
 import { getSortedPosts } from "@utils/content-utils";
 import { formatDateToYYYYMMDD } from "@utils/date-utils";
 import { Icon } from "astro-icon/components";
@@ -10,7 +11,7 @@ const posts = await getSortedPosts();
 const recentPosts = posts.slice(0, 6);
 ---
 
-<MainGridLayout title={i18n(I18nKey.rss)} description={i18n(I18nKey.rssDescription)}>
+<LabPage title={i18n(I18nKey.rss)} description={i18n(I18nKey.rssDescription)}>
     <div class="onload-animation">
         <!-- RSS 标题和介绍 -->
         <div class="card-base rounded-(--radius-large) p-8 mb-6">
@@ -157,4 +158,4 @@ const recentPosts = posts.slice(0, 6);
             });
         }
     </script>
-</MainGridLayout>
+</LabPage>

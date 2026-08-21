@@ -1,42 +1,310 @@
 ---
-import AdvancedSearch from "@components/pages/AdvancedSearch.svelte";
-import I18nKey from "@i18n/i18nKey";
-import { i18n } from "@i18n/translation";
-import MainGridLayout from "@layouts/MainGridLayout.astro";
+// 搜索：全文检索走 Pagefind（构建期生成索引），
+// 标题/标签的即时过滤走内联索引，两者互补。
+import { Icon } from "astro-icon/components";
+import I18nKey from "@/i18n/i18nKey";
+import { i18n } from "@/i18n/translation";
+import LabPage from "@/layouts/LabPage.astro";
+import { getSortedPostsList } from "@/utils/content-utils";
 import { url } from "@/utils/url-utils";
 
+const posts = await getSortedPostsList();
+const index = posts.map((p) => ({
+	t: p.data.title,
+	g: p.data.tags,
+	c: p.data.category || "未分类",
+	u: `/posts/${p.id}/`,
+	d: p.data.published.toISOString().slice(0, 10),
+}));
+
 const title = i18n(I18nKey.search);
-const description = "";
 ---
 
-<MainGridLayout title={title} description={description}>
-    <div class="min-h-[80vh]">
-        <AdvancedSearch client:load title={title} description={description} />
-    </div>
-</MainGridLayout>
+<LabPage title={title} description="搜索文章标题、标签与正文" lede="标题与标签即时匹配，正文走全文检索。">
+	<div class="box" role="search">
+		<Icon is:inline name="lucide:search" class="box-icon" />
+		<input
+			id="q"
+			type="search"
+			placeholder="输入关键词…"
+			autocomplete="off"
+			aria-label="搜索"
+		/>
+		<button id="clear" type="button" aria-label="清空" hidden>
+			<Icon is:inline name="lucide:x" />
+		</button>
+	</div>
 
-{import.meta.env.PROD && (
-<script is:inline define:vars={{ scriptUrl: url('/pagefind/pagefind.js') }}>
-    if (!window.pagefind) {
-        async function loadPagefind() {
-            const url = scriptUrl.replace(/\/$/, "")
-            try {
-                const response = await fetch(url, { method: 'HEAD' });
-                if (response.status !== 200) {
-                    return;
-                }
-                const pagefind = await import(scriptUrl);
-                await pagefind.options({
-                    "excerptLength": 20
-                });
-                window.pagefind = pagefind;
-                window.dispatchEvent(new Event('pagefindready'));
-            } catch (error) {
-                console.warn("Pagefind script not found or failed to load.");
-                window.dispatchEvent(new Event('pagefindloaderror'));
-            }
-        }
-        loadPagefind();
-    }
+	<p class="hint" id="hint">输入任意关键词开始搜索。</p>
+
+	<section class="block" id="quick-block" hidden>
+		<h2 class="block-title micro">标题与标签</h2>
+		<ul class="hits" id="quick"></ul>
+	</section>
+
+	<section class="block" id="full-block" hidden>
+		<h2 class="block-title micro">正文</h2>
+		<ul class="hits" id="full"></ul>
+		<p class="pf-note" id="pf-note" hidden>全文索引尚未就绪（开发模式下不生成）。</p>
+	</section>
+</LabPage>
+
+<script id="quick-index" type="application/json" set:html={JSON.stringify(index)} is:inline />
+
+{
+	import.meta.env.PROD && (
+		<script is:inline define:vars={{ scriptUrl: url("/pagefind/pagefind.js") }}>
+			{`
+			(async () => {
+				try {
+					const u = scriptUrl.replace(/\\/$/, "");
+					const res = await fetch(u, { method: "HEAD" });
+					if (res.status !== 200) throw new Error("missing");
+					const pf = await import(u);
+					await pf.options({ excerptLength: 24 });
+					window.pagefind = pf;
+					window.dispatchEvent(new Event("pagefindready"));
+				} catch {
+					window.dispatchEvent(new Event("pagefinderror"));
+				}
+			})();
+			`}
+		</script>
+	)
+}
+
+<style>
+	.box {
+		display: flex;
+		align-items: center;
+		gap: 0.65rem;
+		padding: 0.85rem 1.15rem;
+		border-radius: 999px;
+		background: var(--card);
+		box-shadow: var(--lift-1);
+		transition: box-shadow 0.3s var(--ease-out);
+	}
+
+	.box:focus-within { box-shadow: var(--lift-2); }
+	.box-icon { color: var(--ink-mute); flex-shrink: 0; }
+
+	.box input {
+		flex: 1;
+		min-width: 0;
+		border: 0;
+		background: none;
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 1rem;
+		outline: none;
+	}
+
+	.box input::placeholder { color: var(--ink-mute); }
+	.box input::-webkit-search-cancel-button { display: none; }
+
+	.box button[hidden] { display: none; }
+
+	.box button {
+		display: grid;
+		place-items: center;
+		width: 1.5rem;
+		height: 1.5rem;
+		border: 0;
+		border-radius: 50%;
+		background: var(--accent-wash);
+		color: var(--accent-deep);
+		cursor: pointer;
+		font-size: 0.85rem;
+	}
+
+	.hint,
+	.pf-note {
+		padding: 2.5rem 1rem;
+		text-align: center;
+		color: var(--ink-soft);
+	}
+
+	.hint[hidden],
+	.pf-note[hidden],
+	.block[hidden] { display: none; }
+
+	.block { margin-top: 2rem; }
+
+	.block-title {
+		margin: 0 0 0.9rem;
+		padding-bottom: 0.75rem;
+		border-bottom: 1px solid var(--hair);
+	}
+
+	.hits {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: grid;
+		gap: 0.6rem;
+	}
+
+	.hits :global(a) {
+		display: block;
+		padding: 0.9rem 1.15rem;
+		border-radius: var(--radius-sm);
+		background: var(--card);
+		box-shadow: var(--lift-1);
+		color: inherit;
+		text-decoration: none;
+		transition:
+			transform 0.4s var(--spring),
+			box-shadow 0.4s var(--ease-out);
+	}
+
+	.hits :global(a:hover) {
+		transform: translateY(-2px);
+		box-shadow: var(--lift-2);
+	}
+
+	.hits :global(.h-title) {
+		font-size: 0.98rem;
+		font-weight: 650;
+		letter-spacing: -0.012em;
+	}
+
+	.hits :global(.h-meta) {
+		display: flex;
+		gap: 0.75rem;
+		margin-top: 0.3rem;
+		font-family: var(--mono);
+		font-size: 0.68rem;
+		letter-spacing: 0.1em;
+		color: var(--ink-mute);
+	}
+
+	.hits :global(.h-excerpt) {
+		margin: 0.4rem 0 0;
+		font-size: 0.85rem;
+		line-height: 1.65;
+		color: var(--ink-soft);
+	}
+
+	.hits :global(mark) {
+		background: var(--accent-wash);
+		color: var(--accent-deep);
+		border-radius: 3px;
+		padding: 0 0.15em;
+	}
+</style>
+
+<script>
+	type Entry = { t: string; g: string[]; c: string; u: string; d: string };
+
+	const el = document.getElementById("quick-index");
+	const entries: Entry[] = el ? JSON.parse(el.textContent || "[]") : [];
+
+	const input = document.getElementById("q") as HTMLInputElement | null;
+	const clear = document.getElementById("clear") as HTMLButtonElement | null;
+	const hint = document.getElementById("hint");
+	const quickBlock = document.getElementById("quick-block");
+	const fullBlock = document.getElementById("full-block");
+	const quick = document.getElementById("quick");
+	const full = document.getElementById("full");
+	const pfNote = document.getElementById("pf-note");
+
+	let pagefindFailed = false;
+	window.addEventListener("pagefinderror", () => { pagefindFailed = true; });
+
+	function esc(v: string): string {
+		return v.replace(/[&<>"']/g, (c) => ({
+			"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+		})[c] as string);
+	}
+
+	function row(href: string, titleHtml: string, meta: string, excerpt?: string): string {
+		return `<li><a href="${href}">
+			<div class="h-title">${titleHtml}</div>
+			<div class="h-meta">${meta}</div>
+			${excerpt ? `<p class="h-excerpt">${excerpt}</p>` : ""}
+		</a></li>`;
+	}
+
+	function runQuick(q: string): number {
+		if (!quick || !quickBlock) return 0;
+		const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+		const hits = entries.filter((e) => {
+			const hay = `${e.t} ${e.g.join(" ")} ${e.c}`.toLowerCase();
+			return terms.every((t) => hay.includes(t));
+		});
+		quick.innerHTML = hits
+			.map((e) => row(e.u, esc(e.t), `${esc(e.c)} · ${esc(e.d.replace(/-/g, "/"))}`))
+			.join("");
+		quickBlock.hidden = hits.length === 0;
+		return hits.length;
+	}
+
+	async function runFull(q: string): Promise<number> {
+		if (!full || !fullBlock) return 0;
+		const pf = (window as any).pagefind;
+		if (!pf) {
+			// 开发模式或索引缺失：只提示，不影响标题/标签的即时匹配
+			fullBlock.hidden = !pagefindFailed;
+			if (pfNote) pfNote.hidden = !pagefindFailed;
+			full.innerHTML = "";
+			return 0;
+		}
+		if (pfNote) pfNote.hidden = true;
+		const search = await pf.search(q);
+		const items = await Promise.all(search.results.slice(0, 10).map((r: any) => r.data()));
+		full.innerHTML = items
+			.map((d: any) => row(d.url, esc(d.meta?.title || d.url), esc(d.url), d.excerpt))
+			.join("");
+		fullBlock.hidden = items.length === 0;
+		return items.length;
+	}
+
+	async function run(raw: string): Promise<void> {
+		const q = raw.trim();
+		if (clear) clear.hidden = q.length === 0;
+
+		if (!q) {
+			if (hint) { hint.hidden = false; hint.textContent = "输入任意关键词开始搜索。"; }
+			if (quickBlock) quickBlock.hidden = true;
+			if (fullBlock) fullBlock.hidden = true;
+			return;
+		}
+
+		const n1 = runQuick(q);
+		const n2 = await runFull(q);
+		if (hint) {
+			hint.hidden = n1 + n2 > 0;
+			hint.textContent = "没有匹配的内容。";
+		}
+	}
+
+	let timer: number | undefined;
+	input?.addEventListener("input", () => {
+		window.clearTimeout(timer);
+		timer = window.setTimeout(() => {
+			run(input.value);
+			const u = new URL(location.href);
+			if (input.value.trim()) u.searchParams.set("q", input.value.trim());
+			else u.searchParams.delete("q");
+			history.replaceState(null, "", u);
+		}, 150);
+	});
+
+	clear?.addEventListener("click", () => {
+		if (!input) return;
+		input.value = "";
+		run("");
+		input.focus();
+	});
+
+	// ?q= 直达，并在 pagefind 就绪后补跑一次全文
+	const initial = new URLSearchParams(location.search).get("q") ?? "";
+	if (initial && input) {
+		input.value = initial;
+		run(initial);
+	}
+	window.addEventListener("pagefindready", () => {
+		if (input?.value.trim()) run(input.value);
+	});
+	input?.focus();
 </script>
-)}

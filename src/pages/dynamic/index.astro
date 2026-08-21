@@ -5,7 +5,8 @@ import DynamicItemTemplate from "@/components/pages/dynamic/DynamicItemTemplate.
 import { commentConfig, dynamicConfig, siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import LabPage from "@/layouts/LabPage.astro";
+import "@/styles/lab-compat.css";
 import "@/styles/dynamic.css";
 import { url } from "@/utils/url-utils";
 
@@ -28,7 +29,7 @@ const dataUrl = dynamicConfig.apiUrl?.startsWith("http")
 const memos = dynamicConfig.memos;
 ---
 
-<MainGridLayout title={title} description={description}>
+<LabPage title={title} description={description} lede={description}>
 	<section class="dynamic-page" aria-labelledby="dynamic-page-title">
 		<div>
 			<header class="dynamic-page-header card-base">
@@ -84,4 +85,4 @@ const memos = dynamicConfig.memos;
 			<DynamicItemTemplate />
 		</div>
 	</section>
-</MainGridLayout>
+</LabPage>

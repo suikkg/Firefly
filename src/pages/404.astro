@@ -2,73 +2,97 @@
 import { Icon } from "astro-icon/components";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import MainGridLayout from "@/layouts/MainGridLayout.astro";
-import { url } from "@/utils/url-utils";
+import LabPage from "@/layouts/LabPage.astro";
 ---
 
-<MainGridLayout title={i18n(I18nKey.notFound)} description={i18n(I18nKey.notFoundDescription)}>
-    <div class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-96">
-        <div class="card-base z-10 px-9 py-12 relative w-full flex flex-col items-center justify-center text-center">
-            <!-- 404 大号数字 -->
-            <div class="text-8xl md:text-9xl font-bold text-(--primary) opacity-20 mb-4">
-                {i18n(I18nKey.notFound)}
-            </div>
-            
-            <!-- 404 图标 -->
-            <div class="mb-6">
-                <Icon is:inline name="lucide:circle-alert" class="text-6xl text-(--primary)" />
-            </div>
-            
-            <!-- 标题 -->
-            <div class="text-3xl md:text-4xl font-bold mb-4 text-90">
-                {i18n(I18nKey.notFoundTitle)}
-            </div>
-            
-            <!-- 描述 -->
-            <p class="text-lg text-75 mb-8 max-w-md">
-                {i18n(I18nKey.notFoundDescription)}
-            </p>
-            
-            <!-- 返回首页按钮 -->
-            <a 
-                href={url("/")}
-                class="inline-flex items-center gap-2 px-6 py-3 bg-(--primary) text-white rounded-(--radius-large) hover:bg-(--btn-content) transition-colors duration-200 font-medium"
-            >
-                <Icon is:inline name="lucide:house" class="text-xl" />
-                {i18n(I18nKey.backToHome)}
-            </a>
-            
-            <!-- 装饰性元素 -->
-            <div class="absolute top-4 left-4 opacity-10">
-                <Icon is:inline name="lucide:frown" class="text-4xl text-(--primary)" />
-            </div>
-            <div class="absolute bottom-4 right-4 opacity-10">
-                <Icon is:inline name="lucide:search-x" class="text-4xl text-(--primary)" />
-            </div>
-        </div>
-    </div>
-</MainGridLayout>
+<LabPage
+	title={i18n(I18nKey.notFound)}
+	description={i18n(I18nKey.notFoundDescription)}
+	lede={i18n(I18nKey.notFoundDescription)}
+>
+	<div class="nf">
+		<span class="nf-code">404</span>
+		<p class="nf-text">这个地址上没有内容。可能已经移动，或者从来就不存在。</p>
+		<div class="nf-actions">
+			<a class="btn primary" href="/">
+				<Icon is:inline name="lucide:house" />
+				<span>回到首页</span>
+			</a>
+			<a class="btn" href="/archive/">
+				<Icon is:inline name="lucide:archive" />
+				<span>浏览归档</span>
+			</a>
+			<a class="btn" href="/search/">
+				<Icon is:inline name="lucide:search" />
+				<span>搜索</span>
+			</a>
+		</div>
+	</div>
+</LabPage>
 
 <style>
-    /* 添加一些动画效果 */
-    .card-base {
-        animation: fadeInUp 0.6s ease-out;
-    }
-    
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(30px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    /* 按钮悬停效果 */
-    a:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
-    }
+	.nf {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1.25rem;
+		padding: clamp(2rem, 8vw, 5rem) 1rem;
+		text-align: center;
+	}
+
+	/* 数字大而淡，作为图形而不是可读文本 */
+	.nf-code {
+		font-family: var(--mono);
+		font-size: clamp(5rem, 20vw, 12rem);
+		font-weight: 500;
+		line-height: 0.9;
+		letter-spacing: -0.05em;
+		color: transparent;
+		-webkit-text-stroke: 2px var(--accent);
+		opacity: 0.55;
+		user-select: none;
+	}
+
+	.nf-text {
+		max-width: 34ch;
+		margin: 0;
+		font-size: 0.98rem;
+		line-height: 1.75;
+		color: var(--ink-soft);
+		text-wrap: pretty;
+	}
+
+	.nf-actions {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.65rem;
+		margin-top: 0.5rem;
+	}
+
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.65rem 1.15rem;
+		border-radius: 999px;
+		background: var(--card);
+		box-shadow: var(--lift-1);
+		color: var(--ink);
+		font-size: 0.88rem;
+		text-decoration: none;
+		transition:
+			transform 0.4s var(--spring),
+			box-shadow 0.4s var(--ease-out),
+			background-color 0.3s var(--ease-out),
+			color 0.3s var(--ease-out);
+	}
+
+	.btn:hover {
+		transform: translateY(-2px);
+		box-shadow: var(--lift-2);
+	}
+
+	.btn.primary { background: var(--accent); color: #fff; }
+	.btn.primary:hover { background: var(--accent-deep); }
 </style>
