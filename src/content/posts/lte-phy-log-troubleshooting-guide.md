@@ -68,6 +68,7 @@ MAC SDU / MAC CE → MAC PDU → TB0 / TB1
 | CW | Codeword | PHY | TB编码后的码字流 | 与TB一一对应 |
 | MCS | Modulation and Coding Scheme | PHY | 调制/编码效率 | MCS1/MCS2 |
 | RV | Redundancy Version | HARQ | 重传冗余版本 | 0/2/3/1 |
+| NDI | New Data Indicator | HARQ | 区分新数据与重传语义 | 与HARQ ID/RV一起对齐 |
 | HARQ ID | HARQ Process ID | MAC/PHY | 区分并行HARQ | 新传/重传对齐 |
 | ACK | Acknowledgement | HARQ | TB解码成功反馈 | PUCCH/PUSCH HARQ-ACK |
 | NACK | Negative ACK | HARQ | TB解码失败反馈 | CRC FAIL后反馈 |
@@ -215,6 +216,58 @@ QPSK=2
 SNR + MCS + Qm + TBS + RE + Layer
 ```
 
+### MCS1 和 MCS2 为什么会同时出现
+
+空间复用存在两个 TB/CW 时，两个 TB 可以分别使用自己的 MCS：
+
+```text
+TB0 → TBS1 → MCS1 → CW0 → 对应若干Layer
+TB1 → TBS2 → MCS2 → CW1 → 对应若干Layer
+```
+
+因此：
+
+```text
+TBS1 != 0, TBS2 = 0
+→ 单TB/单CW
+→ 通常只有MCS1有效
+
+TBS1 != 0, TBS2 != 0
+→ 双TB/双CW
+→ MCS1对应TB0/CW0
+→ MCS2对应TB1/CW1
+```
+
+`MCS1` 与 `MCS2` 不要求相同。例如：
+
+```text
+TB0/CW0：MCS1=28
+TB1/CW1：MCS2=20
+```
+
+表示两个码字使用不同的调制编码等级。两个 CW 经 Layer Mapping、Precoding 和无线信道后，其等效信道质量可以不同，因此调度器可以分别选择 MCS。
+
+如果出现固定一个 TB 成功、一个 TB 失败，例如当前平台按版本定义解析：
+
+```text
+TbCrcHw=0x00010002
+```
+
+则不能只看总 BLER，要拆开比较：
+
+```text
+TB0 vs TB1
+MCS1 vs MCS2
+TBS1 vs TBS2
+CW0 vs CW1
+每个CW对应Layer数
+各RX/空间支路SNR或SINR
+PMI/Precoding
+HARQ ID / NDI / RV
+```
+
+如果长期表现为某个 TB 对应 MCS 明显更高且持续 CRC FAIL，可以怀疑该 CW 的调制编码/码率过激；但不能仅凭 MCS 大小定责，因为最终解码还同时受 `TBS、RE、Qm、Layer、PMI、SNR/SINR、HARQ` 影响。
+
 ## 6. CSI：CQI、PMI、RI 如何影响下行
 
 ```text
@@ -359,15 +412,192 @@ Scheduler生成DCI
 
 再看 CRC：当前平台格式 `TbCrcHw=0x000m000m`。若当前版本定义 `2=CRC OK, 1=CRC FAIL`，则 `0x00020002` 两 TB 均成功，`0x00010002` 一个成功一个失败。持续如此，按 TB 计 BLER 会接近 50%。
 
-HARQ 必须按：
+## 12. HARQ：为什么 CRC FAIL 后还能恢复
+
+**HARQ（Hybrid Automatic Repeat reQuest，混合自动重传请求）**是 LTE PHY/MAC 中围绕 TB 实现可靠传输的机制。最核心的思路是：
 
 ```text
-同CC + 同HarqId + 同TB/CW + NDI/RV
+发送TB
+→ 接收端解码
+→ CRC判断
+→ ACK/NACK
+→ 失败时重传
+→ 与之前接收的软信息合并
+→ 再次解码
 ```
 
-对齐。FDD 下行通常 8 个 HARQ process；指导资料典型 RV 为 0→2→3→1。
+所以 HARQ 的核心单位是 **TB**，不是 Layer，也不是“整个 PDSCH”这个抽象概念。
 
-## 12. DTX 到底是什么
+### 12.1 下行 HARQ 完整流程
+
+```text
+eNB Scheduler
+   ↓
+PDCCH/DCI
+   │ HARQ ID / NDI / RV / MCS / RB ...
+   ↓
+PDSCH发送TB
+   ↓
+UE解码
+   ├─ CRC OK   → 形成ACK
+   └─ CRC FAIL → 形成NACK
+                    ↓
+              PUCCH/PUSCH反馈
+                    ↓
+               eNB接收反馈
+          ┌─────────┴─────────┐
+         ACK                 NACK
+          │                    │
+      该TB完成             重传该TB
+                               ↓
+                         UE软合并再解码
+```
+
+### 12.2 为什么叫 Hybrid
+
+HARQ 不只是“失败后把完全相同的数据再发一次”。UE 会保留之前解码得到的软信息，重传到来后进行 **Soft Combining（软合并）**。
+
+典型增量冗余过程可以表现为：
+
+```text
+第一次：RV=0 ─┐
+第二次：RV=2 ─┼→ Soft Combining → Turbo Decode → CRC
+第三次：RV=3 ─┤
+第四次：RV=1 ─┘
+```
+
+因此：
+
+```text
+RV=0 → CRC FAIL
+RV=2 → CRC OK
+```
+
+并不矛盾。第二次解码利用了重传信息以及之前保存的软信息。
+
+`0→2→3→1` 是常见的 RV 观察顺序，但分析实际 Log 时仍应以具体调度字段为准。
+
+### 12.3 HARQ ID 是什么
+
+如果每发送一个 TB 都停下来等待反馈，空口利用率会很低。LTE 使用多个并行 HARQ Process：
+
+```text
+HARQ ID 0 → TB A → 等反馈
+HARQ ID 1 → TB B → 等反馈
+HARQ ID 2 → TB C → 等反馈
+HARQ ID 3 → TB D → 等反馈
+...
+```
+
+LTE FDD 下行通常有 8 个 HARQ Process，因此 Log 中常看到不同 `HarqId` 交错出现。
+
+例如：
+
+```text
+HarqId=3  NDI=0  RV=0  CRC FAIL
+...
+HarqId=3  NDI=0  RV=2  CRC OK
+```
+
+很可能是在观察同一个 HARQ process 的新传和后续重传。
+
+但**不能只靠 HarqId 判断是不是同一个 TB**，还必须结合 NDI、RV、TB/CW、CC 和时序。
+
+### 12.4 NDI 是什么
+
+**NDI（New Data Indicator）**用于帮助 HARQ process 区分新数据与重传语义。工程分析时不要单独看某一个字段，而应联合：
+
+```text
+CC
++ HARQ ID
++ NDI
++ RV
++ TB/CW index
++ SFN.Subframe
++ CRC结果
+```
+
+建立完整 HARQ 时间线。
+
+### 12.5 双 TB / 双 CW 时 HARQ 怎么看
+
+空间复用时可能同时存在：
+
+```text
+PDSCH
+ ├─ TB0 → TBS1 → MCS1 → CW0 → CRC0
+ └─ TB1 → TBS2 → MCS2 → CW1 → CRC1
+```
+
+两个 TB 的解码结果可以不同：
+
+```text
+TB0：CRC OK
+TB1：CRC FAIL
+```
+
+因此 HARQ-ACK 也可能表现为一个成功、一个失败，后续重点追踪失败 TB 对应的 HARQ 重传。
+
+如果长期看到一个 TB 成功、一个 TB 失败，应沿着：
+
+```text
+失败TB
+→ 对应CW
+→ MCS1/MCS2
+→ TBS1/TBS2
+→ Layer Mapping
+→ PMI/Precoding
+→ SNR/SINR
+→ HARQ ID
+→ NDI
+→ RV
+→ 重传最终CRC
+```
+
+而不是只看一个总 BLER 数值。
+
+### 12.6 上行 HARQ
+
+上行方向角色反过来：
+
+```text
+UE通过PUSCH发送TB
+→ eNB解码PUSCH
+→ eNB判断CRC
+→ 网络给出HARQ相关重传控制
+→ UE必要时重传PUSCH
+→ 接收端进行软合并
+```
+
+因此看到 HARQ 时先确定方向：
+
+```text
+DL HARQ：PDSCH TB由UE解码，UE反馈HARQ-ACK
+UL HARQ：PUSCH TB由eNB解码，网络控制UE是否重传
+```
+
+### 12.7 HARQ Log 固定分析模板
+
+以后遇到 HARQ 问题，建议按这个顺序：
+
+```text
+1. CC：PCC还是哪个SCC
+2. SFN.Subframe
+3. HARQ ID
+4. NDI：新数据还是重传语义
+5. RV：当前冗余版本
+6. TB0/TB1、CW0/CW1
+7. TBS1/TBS2
+8. MCS1/MCS2
+9. Rank/Layer/PMI
+10. CRC结果
+11. UE生成ACK还是NACK
+12. PUCCH/PUSCH是否实际发送
+13. eNB最终收到ACK/NACK还是判DTX
+14. 后续相同HARQ process是否重传并恢复
+```
+
+## 13. DTX 到底是什么
 
 DTX 最容易和 NACK 混淆。工程上先记住：
 
@@ -404,7 +634,56 @@ UE是否正确收到DCI？
 1. **UE根本没有形成反馈**：例如 PDCCH/DCI 漏检，UE不知道需要解这次 PDSCH。
 2. **UE形成并发送了反馈，但 eNB/仪表没收到**：例如 PUCCH/PUSCH 上行链路异常、时序错误、功率不足、资源错误。
 
-## 13. ACK、NACK、DTX 的区别与定位方向
+### DTX 通常是谁统计的
+
+在下行 HARQ 语境里，DTX 最典型的是 **eNB/仪表接收侧统计结果**：基站预期 UE 在规定时刻返回 HARQ-ACK，但没有可靠检测到 ACK 或 NACK。
+
+因此要严格区分：
+
+```text
+UE TbCrcHw / CRC OK-FAIL
+= UE对下行TB的本地解码结果
+
+UE ACK/NACK生成
+= UE根据TB CRC形成的HARQ反馈
+
+eNB ACK/NACK/DTX统计
+= 基站对UE上行HARQ反馈的接收判决
+```
+
+例如：
+
+```text
+UE PDSCH CRC FAIL
+→ UE生成NACK
+→ UE正确发送NACK
+→ eNB正确收到
+→ eNB统计NACK
+```
+
+而：
+
+```text
+UE PDSCH CRC FAIL
+→ UE生成NACK
+→ UE发送PUCCH/PUSCH
+→ 上行反馈未被eNB可靠解出
+→ eNB可能统计DTX
+```
+
+还可能是：
+
+```text
+UE漏检PDCCH/DCI
+→ UE不知道存在这次PDSCH
+→ UE没有按预期形成HARQ-ACK
+→ eNB等待反馈但未收到
+→ eNB侧DTX
+```
+
+因此如果仪表里出现 `PdschCrcAckCnt / PdschCrcNackCnt / PdschCrcDTXCnt`，虽然字段名带 `PdschCrc`，也不能仅凭名字把 DTX 当成“UE PDSCH CRC 的第三种结果”；必须结合该仪表计数器定义确认统计位置。
+
+## 14. ACK、NACK、DTX 的区别与定位方向
 
 | 结果 | UE侧可能发生了什么 | eNB/仪表看到什么 | 第一排查方向 |
 |---|---|---|---|
@@ -454,9 +733,9 @@ NACK多 ≠ DTX多
 
 两者排障起点不同。NACK 首先看下行数据解码，DTX 首先判断是**下行控制漏检导致没有反馈**，还是**上行反馈链路丢失**。
 
-## 14. DTX 的完整排查流程
+## 15. DTX 的完整排查流程
 
-### 14.1 第一步：确认这次反馈是否真的应该存在
+### 15.1 第一步：确认这次反馈是否真的应该存在
 
 先用仪表 Trace 对齐：
 
@@ -472,7 +751,7 @@ PDSCH是否实际调度
 
 避免把“本来没有调度”误统计成 DTX。
 
-### 14.2 第二步：确认 UE 是否收到 DCI
+### 15.2 第二步：确认 UE 是否收到 DCI
 
 如果仪表发送了 PDSCH，但 UE 没检测到对应 DCI：
 
@@ -498,7 +777,7 @@ PDCCH功率
 
 如果 `DtchCfg` 明显大于 `DtchInt`，结合平台定义可优先怀疑 DCI/PDSCH 处理链存在漏检。
 
-### 14.3 第三步：确认 UE 是否完成 PDSCH 解码
+### 15.3 第三步：确认 UE 是否完成 PDSCH 解码
 
 若 DCI 已收到，则看：
 
@@ -513,7 +792,7 @@ TbCrcHw
 
 如果 CRC FAIL 且 UE 有正常 NACK TX，但仪表却记成 DTX，问题已经从“下行解码”转移到“上行 HARQ 反馈接收”。
 
-### 14.4 第四步：确认 HARQ-ACK 走 PUCCH 还是 PUSCH
+### 15.4 第四步：确认 HARQ-ACK 走 PUCCH 还是 PUSCH
 
 LTE 下行 HARQ-ACK 可以根据调度情况走 PUCCH，也可以和上行数据/UCI 复用到 PUSCH。
 
@@ -529,7 +808,7 @@ LTE 下行 HARQ-ACK 可以根据调度情况走 PUCCH，也可以和上行数据
 
 如果只查 PUCCH，很容易把“反馈实际复用到了 PUSCH”误判成没发。
 
-### 14.5 第五步：查 UE 上行 TX
+### 15.5 第五步：查 UE 上行 TX
 
 若 UE 日志显示已经生成 ACK/NACK，则继续确认：
 
@@ -552,7 +831,7 @@ UE有TX，但仪表收不到         → RF/功率/TA/频偏/资源配置问题
 仪表收到能量但解不出ACK/NACK → PUCCH/PUSCH格式/资源/时序/信道质量问题
 ```
 
-### 14.6 第六步：看 DTX 是否只发生在某个 CC
+### 15.6 第六步：看 DTX 是否只发生在某个 CC
 
 CA 场景一定按 CC 分开统计：
 
@@ -573,7 +852,7 @@ SCell是否已配置
 
 如果 SCell 尚未真正激活，却拿其后续期望数据去统计，也可能造成异常统计结果。
 
-## 15. NACK/DTX 与 BLER 统计要分清
+## 16. NACK/DTX 与 BLER 统计要分清
 
 测试脚本里经常同时出现：
 
