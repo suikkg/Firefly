@@ -4,7 +4,7 @@ published: 2026-09-01
 updated: 2026-09-01
 description: 系统梳理 TX/RX、TM、Rank、Layer、TB、TBS、Codeword、MCS、HARQ、CSI、PDCCH/PDSCH、PUCCH/PUSCH、随机接入、CA/SCell、测量之间的关系及异常定位流程。
 image: ''
-tags: [LTE, PHY, MIMO, TM, PDSCH, PUSCH, HARQ, CSI, CA, SCell, Log分析]
+tags: [LTE, PHY, MIMO, TM, PDSCH, PUSCH, HARQ, CSI, CA, SCell, DTX, Log分析]
 category: 协议笔记
 draft: false
 lang: zh-CN
@@ -41,6 +41,12 @@ MAC SDU / MAC CE → MAC PDU → TB0 / TB1
                            TB CRC
                        ┌──────┴──────┐
                       ACK           NACK
+                       │              │
+                       └──── HARQ反馈 ─┘
+                              │
+                         PUCCH/PUSCH
+                              │
+                 eNB若未检测到有效反馈 → DTX
 ```
 
 必须区分三个层级：**TB/CW 是编码数据组织；Layer 是空间数据流；TX/RX 是无线收发资源。** 它们有关联，但不能直接互相等同。
@@ -63,6 +69,9 @@ MAC SDU / MAC CE → MAC PDU → TB0 / TB1
 | MCS | Modulation and Coding Scheme | PHY | 调制/编码效率 | MCS1/MCS2 |
 | RV | Redundancy Version | HARQ | 重传冗余版本 | 0/2/3/1 |
 | HARQ ID | HARQ Process ID | MAC/PHY | 区分并行HARQ | 新传/重传对齐 |
+| ACK | Acknowledgement | HARQ | TB解码成功反馈 | PUCCH/PUSCH HARQ-ACK |
+| NACK | Negative ACK | HARQ | TB解码失败反馈 | CRC FAIL后反馈 |
+| DTX | Discontinuous Transmission / 未检测到期望反馈 | HARQ/PHY统计 | 应有传输/反馈但接收端未检测到有效信号 | 时序、资源、TX、PUCCH/PUSCH、DCI |
 | DCI | Downlink Control Information | PDCCH | 下发调度参数 | DCI漏检 |
 | CE | MAC Control Element | MAC | MAC控制命令 | SCell激活/TA等 |
 
@@ -336,8 +345,10 @@ Scheduler生成DCI
 → 获得RB/MCS/HARQ ID/NDI/RV/MIMO信息
 → UE解PDSCH
 → TB0/TB1 CRC
-→ ACK/NACK
-→ PUCCH/PUSCH反馈
+→ CRC OK / CRC FAIL
+→ UE形成ACK/NACK
+→ PUCCH或PUSCH发送HARQ-ACK
+→ eNB检测ACK / NACK / DTX
 ```
 
 先看 DCI。当前指导资料中 `DtchCfg` 为发送 DCI 总数，`DtchInt` 为实际硬件中断数；两者明显不匹配优先怀疑 DCI 漏检。
@@ -355,3 +366,263 @@ HARQ 必须按：
 ```
 
 对齐。FDD 下行通常 8 个 HARQ process；指导资料典型 RV 为 0→2→3→1。
+
+## 12. DTX 到底是什么
+
+DTX 最容易和 NACK 混淆。工程上先记住：
+
+```text
+NACK = 接收端明确检测到了反馈，并判定“失败”
+DTX  = 本来应该有反馈/传输，但接收端没有检测到可判为ACK或NACK的有效信号
+```
+
+因此 DTX 不是“另一种 CRC FAIL”。CRC FAIL 发生在数据解码结果层面，而 DTX 表示**期望的物理信号/反馈没有被可靠检测到**。
+
+以下是典型下行 HARQ 场景：
+
+```text
+eNB发送PDSCH
+   ↓
+UE是否正确收到DCI？
+   ├─ 否 → UE可能根本不知道有这次PDSCH
+   │       → 不形成预期HARQ反馈
+   │       → eNB侧可能统计DTX
+   │
+   └─ 是
+       ↓
+    UE解PDSCH
+       ├─ CRC OK   → UE发ACK
+       └─ CRC FAIL → UE发NACK
+                         ↓
+              ACK/NACK是否成功到达eNB？
+                   ├─ 是 → eNB得到ACK/NACK
+                   └─ 否 → eNB可能判DTX
+```
+
+所以看到 DTX 时，不能直接得出“PDSCH 解码失败”。可能存在两大类原因：
+
+1. **UE根本没有形成反馈**：例如 PDCCH/DCI 漏检，UE不知道需要解这次 PDSCH。
+2. **UE形成并发送了反馈，但 eNB/仪表没收到**：例如 PUCCH/PUSCH 上行链路异常、时序错误、功率不足、资源错误。
+
+## 13. ACK、NACK、DTX 的区别与定位方向
+
+| 结果 | UE侧可能发生了什么 | eNB/仪表看到什么 | 第一排查方向 |
+|---|---|---|---|
+| ACK | PDSCH CRC OK，反馈成功 | ACK | 下行正常 |
+| NACK | PDSCH CRC FAIL，反馈成功 | NACK | PDSCH、SNR、MCS、Rank/Layer、CW |
+| DTX | UE未发反馈，或反馈没被收到 | 无有效ACK/NACK | DCI、HARQ反馈时序、PUCCH/PUSCH、UL TX |
+
+### NACK 多时
+
+优先看：
+
+```text
+PDCCH/DCI正常
+→ PDSCH确实被调度
+→ TbCrcHw/CRC FAIL
+→ 哪个TB/CW失败
+→ MCS/TBS/Qm
+→ Rank/Layer/PMI
+→ 各RX SNR/SINR
+→ HARQ重传是否恢复
+```
+
+这种情况更像**数据解码质量问题**。
+
+### DTX 多时
+
+优先看：
+
+```text
+仪表是否真的下发了该次PDSCH
+→ UE是否检测到对应DCI
+→ UE是否产生PDSCH decode interrupt
+→ UE是否生成HARQ-ACK
+→ HARQ-ACK配置应走PUCCH还是PUSCH
+→ UE对应子帧是否有TX
+→ PUCCH/PUSCH资源是否正确
+→ TA/上行定时是否正确
+→ UE TX功率是否正常
+→ 仪表是否实际检测到上行反馈
+```
+
+因此：
+
+```text
+NACK多 ≠ DTX多
+```
+
+两者排障起点不同。NACK 首先看下行数据解码，DTX 首先判断是**下行控制漏检导致没有反馈**，还是**上行反馈链路丢失**。
+
+## 14. DTX 的完整排查流程
+
+### 14.1 第一步：确认这次反馈是否真的应该存在
+
+先用仪表 Trace 对齐：
+
+```text
+SFN.Subframe
+CC/PCC/SCC
+RNTI
+HARQ ID
+TB/CW数量
+PDSCH是否实际调度
+预期HARQ反馈时刻
+```
+
+避免把“本来没有调度”误统计成 DTX。
+
+### 14.2 第二步：确认 UE 是否收到 DCI
+
+如果仪表发送了 PDSCH，但 UE 没检测到对应 DCI：
+
+```text
+仪表：PDSCH已发
+UE：无对应DCI / 无PDSCH decode
+eNB：等不到HARQ-ACK
+结果：DTX
+```
+
+此时排：
+
+```text
+PDCCH功率
+→ CCE/Aggregation Level
+→ RNTI
+→ DCI format
+→ Search Space
+→ PDCCH SNR
+→ UE DCI盲检结果
+→ DtchCfg vs DtchInt
+```
+
+如果 `DtchCfg` 明显大于 `DtchInt`，结合平台定义可优先怀疑 DCI/PDSCH 处理链存在漏检。
+
+### 14.3 第三步：确认 UE 是否完成 PDSCH 解码
+
+若 DCI 已收到，则看：
+
+```text
+TBS1/TBS2
+MCS1/MCS2
+HarqId
+RV
+Tpmi
+TbCrcHw
+```
+
+如果 CRC FAIL 且 UE 有正常 NACK TX，但仪表却记成 DTX，问题已经从“下行解码”转移到“上行 HARQ 反馈接收”。
+
+### 14.4 第四步：确认 HARQ-ACK 走 PUCCH 还是 PUSCH
+
+LTE 下行 HARQ-ACK 可以根据调度情况走 PUCCH，也可以和上行数据/UCI 复用到 PUSCH。
+
+所以不要只搜 `PUCCH`：
+
+```text
+预期HARQ-ACK
+   ↓
+该时刻是否同时有PUSCH？
+   ├─ 否 → 查PUCCH
+   └─ 是 → 查UCI on PUSCH / HARQ-ACK multiplexing
+```
+
+如果只查 PUCCH，很容易把“反馈实际复用到了 PUSCH”误判成没发。
+
+### 14.5 第五步：查 UE 上行 TX
+
+若 UE 日志显示已经生成 ACK/NACK，则继续确认：
+
+```text
+PUCCH/PUSCH TX request
+→ 实际TX interrupt
+→ RB/资源索引
+→ Format
+→ TX power
+→ TA
+→ UL frequency
+→ 仪表接收功率/SNR
+```
+
+典型问题：
+
+```text
+UE有ACK生成，但无TX事件       → PHY/MAC调度或TX链路问题
+UE有TX，但仪表收不到         → RF/功率/TA/频偏/资源配置问题
+仪表收到能量但解不出ACK/NACK → PUCCH/PUSCH格式/资源/时序/信道质量问题
+```
+
+### 14.6 第六步：看 DTX 是否只发生在某个 CC
+
+CA 场景一定按 CC 分开统计：
+
+```text
+PCC DTX正常，SCC DTX高
+```
+
+不能直接归因整个 UE 上行异常，应继续看：
+
+```text
+SCell是否已配置
+→ 是否已激活
+→ 对应PDSCH是否真的调度
+→ HARQ反馈映射
+→ PUCCH通常仍在PCell还是存在PUSCH复用
+→ CA相关UCI配置
+```
+
+如果 SCell 尚未真正激活，却拿其后续期望数据去统计，也可能造成异常统计结果。
+
+## 15. NACK/DTX 与 BLER 统计要分清
+
+测试脚本里经常同时出现：
+
+```text
+ACK
+NACK
+DTX
+NACK/DTX
+```
+
+不能默认所有工具的 BLER 公式都相同。常见统计可能是：
+
+```text
+BLER = NACK / (ACK + NACK)
+```
+
+也可能把 DTX 作为失败加入：
+
+```text
+BLER-like fail ratio = (NACK + DTX) / (ACK + NACK + DTX)
+```
+
+当前平台如果存在：
+
+```text
+PdschCrcAckCnt
+PdschCrcNackCnt
+PdschCrcDTXCnt
+PdschCrcNACK/DTXCnt
+```
+
+必须先确认每个计数器的定义和自动化最终公式，尤其 `NACK/DTX` 很可能是“无法进一步区分 NACK 与 DTX 的失败类统计”，不能简单当成纯 NACK。
+
+分析时建议同时保留三层证据：
+
+```text
+1. PHY TB CRC：数据到底解成功没有
+2. UE HARQ反馈：UE生成的是ACK还是NACK
+3. 仪表HARQ接收：仪表最终判ACK/NACK/DTX中的哪一种
+```
+
+只有这样才能区分：
+
+```text
+真正的PDSCH解码失败
+vs
+UE没有形成反馈
+vs
+UE反馈已发但仪表没收到
+```
+
+这也是排查 DTX 最关键的思维方式。
