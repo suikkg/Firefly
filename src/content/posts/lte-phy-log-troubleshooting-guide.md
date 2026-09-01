@@ -1,317 +1,272 @@
 ---
-title: LTE 物理层 Log 分析与异常排查指南
+title: LTE 物理层完整学习与 Log 分析指南
 published: 2026-09-01
-description: 面向 LTE CPE/UE 仪表测试，梳理小区搜索、随机接入、PDCCH/PDSCH、TB/CW/Layer、HARQ、PUCCH/PUSCH、CSI、CA/SCell、测量及上下行异常的 Log 定位方法。
+updated: 2026-09-01
+description: 系统梳理 TX/RX、TM、Rank、Layer、TB、TBS、Codeword、MCS、HARQ、CSI、PDCCH/PDSCH、PUCCH/PUSCH、随机接入、CA/SCell、测量之间的关系及异常定位流程。
 image: ''
-tags: [LTE, PHY, PDSCH, PUSCH, HARQ, CSI, CA, SCell, Log分析]
+tags: [LTE, PHY, MIMO, TM, PDSCH, PUSCH, HARQ, CSI, CA, SCell, Log分析]
 category: 协议笔记
 draft: false
 lang: zh-CN
-slug: lte-phy-log-troubleshooting-guide
 ---
 
-> 本文以 LTE CPE/UE + 仪表测试为主要场景。文中的 `Tpmi`、`TbCrcHw`、`DtchCfg`、`DtchInt` 等字段属于具体平台/工具的 Log 表达，不是 3GPP 统一字段名。位域含义必须以对应平台版本的 Log 解析定义为准，不能把某个平台的十六进制布局直接套到其他芯片或版本。
+> 面向 LTE CPE/UE + 仪表测试。`Tpmi`、`TbCrcHw`、`DtchCfg`、`DtchInt` 等为当前测试平台私有 Log 字段，并非 3GPP 标准字段名；换平台/版本必须重新核对位域定义。
 
-## 1. 一张图理解 LTE 数据链路
-
-下行：
+## 1. 完整物理层模型
 
 ```text
-eNB MAC
-  │  MAC PDU（业务数据 + MAC CE）
-  ▼
-Transport Block (TB)
-  │ TB CRC → Code Block 分段 → Turbo 编码 → Rate Matching
-  ▼
-Codeword (CW)
-  │ Scrambling → Modulation
-  ▼
-Layer Mapping
-  │ Precoding
-  ▼
-Antenna Port / TX
-  │ 无线信道
-  ▼
-UE RX → 均衡/解调/译码 → TB CRC
-  │
-  ├─ CRC OK   → ACK
-  └─ CRC FAIL → NACK（或无法形成有效反馈）
+                         ┌──── CSI反馈：CQI/PMI/RI ────┐
+UE信道估计 ──────────────┘                            ▼
+                                               eNB Scheduler
+                                                    │ RB/MCS/Rank/PMI/TBS
+                                                    ▼
+MAC SDU / MAC CE → MAC PDU → TB0 / TB1
+                              │ CRC / Turbo / Rate Matching
+                              ▼
+                         CW0 / CW1
+                              │ Scrambling / Modulation
+                              ▼
+                         Layer Mapping
+                              │ Precoding
+                              ▼
+                    Antenna Port / TX
+                              │ 空中信道
+                              ▼
+                       UE RX0/RX1/...
+                              │ 信道估计/MIMO检测
+                              ▼
+                     解调/解扰/Turbo译码
+                              │
+                           TB CRC
+                       ┌──────┴──────┐
+                      ACK           NACK
 ```
 
-上行方向基本相反：UE MAC 形成 UL-SCH TB，经 PHY 编码、调制后通过 PUSCH 发给 eNB；eNB 解码后通过 PHICH 对相应 PUSCH HARQ 传输给出 ACK/NACK。
+必须区分三个层级：**TB/CW 是编码数据组织；Layer 是空间数据流；TX/RX 是无线收发资源。** 它们有关联，但不能直接互相等同。
 
-控制面与数据面的核心关系：
+## 2. 核心名词总表
+
+| 名词 | 全称 | 所属 | 作用 | Log重点 |
+|---|---|---|---|---|
+| TX | Transmit | RF/天线 | 发射无线信号 | 小区TX/端口配置 |
+| RX | Receive | UE RF | 接收支路 | RX0~RX3、SNR/RSSI |
+| TM | Transmission Mode | RRC/PDSCH | 规定下行MIMO机制 | Dedicated/Reconfiguration |
+| Rank | Transmission Rank | MIMO | 实际空间维数 | 实际Layer总数 |
+| RI | Rank Indicator | CSI | UE建议Rank | CSI上报 |
+| PMI | Precoding Matrix Indicator | CSI | 推荐预编码 | CSI/预编码 |
+| CQI | Channel Quality Indicator | CSI | 链路质量建议 | MCS自适应 |
+| Layer | Transmission Layer | PHY/MIMO | 空间数据流 | `Tpmi`/实际调度 |
+| TB | Transport Block | MAC↔PHY | HARQ数据块 | TBS/CRC/HARQ |
+| TBS | Transport Block Size | 调度 | TB比特数 | `TBS1/TBS2` |
+| CW | Codeword | PHY | TB编码后的码字流 | 与TB一一对应 |
+| MCS | Modulation and Coding Scheme | PHY | 调制/编码效率 | MCS1/MCS2 |
+| RV | Redundancy Version | HARQ | 重传冗余版本 | 0/2/3/1 |
+| HARQ ID | HARQ Process ID | MAC/PHY | 区分并行HARQ | 新传/重传对齐 |
+| DCI | Downlink Control Information | PDCCH | 下发调度参数 | DCI漏检 |
+| CE | MAC Control Element | MAC | MAC控制命令 | SCell激活/TA等 |
+
+## 3. TX、RX、Layer、Rank、CW、TB 的关系
+
+### TX 与 RX
+
+TX 表示发射侧资源。当前指导资料中 `dwAntNum=4` 表示小区侧 TX 天线数/相关天线配置。但严格来说：
 
 ```text
-PDCCH/DCI ──告诉 UE──> 去哪里、用什么参数解 PDSCH
-PDSCH     ──承载────> DL-SCH / TB / RRC / MAC CE / 用户数据
-PUCCH     ──常承载──> HARQ-ACK、SR、周期 CSI
-PUSCH     ──承载────> UL-SCH，也可复用 UCI/CSI
-PHICH     ──反馈────> eNB 对 UE PUSCH 的 ACK/NACK
+物理TX天线 ≠ Antenna Port ≠ Layer
 ```
 
----
-
-## 2. 高频名词
-
-### 2.1 TB：Transport Block
-
-TB 是 MAC 交给 PHY 的一块传输数据，是 HARQ 操作的重要数据单位。
-
-- `TBS`：Transport Block Size，TB 大小。
-- 下行空间复用时一个调度最多可有两个 TB。
-- Log 常见 `TBS1/TBS2`。
-- `TBS2 = 0` 通常表示当前调度只有一个 TB；`TBS2 != 0` 表示两个 TB，但最终应结合平台字段定义确认。
-
-### 2.2 CW：Codeword
-
-CW 是 PHY 编码链路中的码字。工程分析时可以按下面的链路理解：
+RX0/RX1/RX2/RX3 是 UE 接收链。4RX UE 可以当前只收 Rank1，也可以在条件和能力允许时收更高 Rank，所以：
 
 ```text
-TB → CRC/分段/信道编码/速率匹配 → CW → 调制 → Layer Mapping
+4RX ≠ 永远4Layer
+2Layer ≠ 2RX
 ```
 
-LTE PDSCH 空间复用中，TB 与 CW 数量是一一对应的，因此工程 Log 中经常通过 TB 数量判断 CW 数量：
+RX 数应从 RF/PHY RX-chain 开关及 RX0~RX3 的 SNR/RSSI/RSRP/AGC 判断，不能从 `Tpmi` 推导。
+
+### Layer 与 Rank
+
+对一次实际 PDSCH 空间传输：
+
+```text
+Rank1 = 1 Layer
+Rank2 = 2 Layer
+Rank3 = 3 Layer
+Rank4 = 4 Layer
+```
+
+RI 是 UE 推荐值；最终实际 Rank/Layer 是 eNB Scheduler 的调度结果。因此看某个子帧实际几层，应看 PDSCH 调度 Log，而不是只看 RI。
+
+### TB、TBS 与 CW
+
+```text
+MAC PDU → TB → TB CRC/分段/Turbo编码/Rate Matching → Codeword
+```
+
+TB 和 CW 不是同一个概念，但 LTE PDSCH 中数量一一对应：
 
 ```text
 1 TB → 1 CW
 2 TB → 2 CW
 ```
 
-但 TB 和 CW 不是同一个协议概念。
-
-### 2.3 Layer：传输层
-
-Layer 是 MIMO 空间复用的数据流层，不等同于物理 TX/RX 天线。
+工程判断通常是：
 
 ```text
-Codeword → Layer Mapping → Precoding → Antenna Ports
+TBS1 != 0, TBS2 = 0 → 1 TB / 1 CW
+TBS1 != 0, TBS2 != 0 → 2 TB / 2 CW
 ```
 
-因此：
+### CW 与 Layer
 
-- 2 Layer 不等于 UE 有 2 RX。
-- 4 Layer 不等于当前一定存在 4 根物理发射天线。
-- Layer 数描述当前 PDSCH 空间传输 Rank。
-
-对于本文所用平台 Log，指导资料给出的 `Tpmi` 格式为：
+CW 数不等于 Layer 数。多个 Layer 可以承载一个或两个 CW。当前平台指导资料定义：
 
 ```text
 Tpmi = 0x0p0q00ab
-             ││  └─ PMI index（平台定义）
-             │└──── 第二个 TB/CW 对应 Layer 数
-             └───── 第一个 TB/CW 对应 Layer 数
 ```
+
+`p/q` 分别表示第一个、第二个 TB/CW 对应 Layer 数，`ab` 为 PMI index。
 
 例如：
 
 ```text
-Tpmi = 0x02020422
+Tpmi=0x02020422
+TBS1 != 0
+TBS2 != 0
 ```
 
-按该平台定义解析为：
+解析为：
 
 ```text
+TB0/CW0 → 2 Layer
 TB1/CW1 → 2 Layer
-TB2/CW2 → 2 Layer
-总 Rank/Layer = 4
+总Layer/实际Rank = 4
 ```
 
-前提是当前确实存在两个 TB，例如 `TBS2 != 0`。
+## 4. TM 控制什么
 
-### 2.4 Rank / RI
+TM 是 RRC 配置给 UE 的 PDSCH Transmission Mode，规定 UE 使用哪套 MIMO、参考信号和预编码机制。
 
-Rank 表示当前 MIMO 信道能够支持、并被选择使用的空间层数。RI（Rank Indicator）是 UE CSI 反馈的一部分，用于向 eNB 报告建议 Rank。
+| TM | 工程用途 | 重点 |
+|---|---|---|
+| TM1 | 单天线端口 | 基础单流 |
+| TM2 | 发射分集 | 可靠性 |
+| TM3 | 开环空间复用 | Rank/Layer |
+| TM4 | 闭环空间复用 | RI/PMI/CQI、Rank、CW、Layer |
+| TM5 | MU-MIMO | 多用户MIMO |
+| TM6 | 单层闭环预编码 | Rank1闭环 |
+| TM7~10 | UE-specific RS/高级传输 | 高版本MIMO/波束机制 |
+
+TM4 的实际链路：
 
 ```text
-RI = 1 → 建议单 Layer
-RI = 2 → 建议双 Layer
-...
+UE测量信道
+→ RI + PMI + CQI
+→ PUCCH/PUSCH上报CSI
+→ eNB Scheduler
+→ 选择实际Rank/PMI/MCS/RB/TBS
+→ 形成1或2 TB
+→ 形成1或2 CW
+→ Layer Mapping
+→ Precoding
+→ PDSCH
 ```
 
-注意：UE 上报 RI 是建议/信道状态反馈，最终实际 PDSCH Layer 由 eNB 调度决定。分析某个具体子帧实际用了几层，应优先看该子帧实际 PDSCH/PHY 调度 Log，而不是只看历史 RI。
+所以不能写成 `TM4=4TX`、`TM4=4RX`、`TM4=4Layer` 或 `TM4=2CW`；这些必须分别确认。
 
-### 2.5 PMI
+## 5. TBS、MCS、Qm、RE、Layer 与码率
 
-PMI（Precoding Matrix Indicator）是 CSI 的一部分，UE 根据下行信道估计向 eNB 推荐预编码矩阵。
-
-PMI 不直接表示“几根天线”。它与 Rank、天线端口配置、TM 等共同决定可用预编码方式。
-
-### 2.6 CQI
-
-CQI（Channel Quality Indicator）表示 UE 对下行信道质量/可支持传输效率的量化反馈。eNB 可据此选择 MCS。
-
-典型关系：
+一次 PDSCH 的数据量由资源和链路效率共同决定：
 
 ```text
-信道变差 → CQI 下降 → eNB 应倾向降低 MCS
-信道变好 → CQI 上升 → eNB 可提高 MCS
+RB/可用RE + MCS + 调制阶数Qm + Layer + TBS表 → TBS
 ```
 
-CQI 不是 SNR 的直接等价值，也不是 MCS 命令。
-
-### 2.7 CSI
-
-CSI（Channel State Information）在 LTE 中主要涉及：
-
-- CQI：建议的信道质量/传输效率。
-- PMI：建议的预编码矩阵。
-- RI：建议的空间 Rank。
-
-根据配置，CSI 可周期性通过 PUCCH 上报，也可在 PUSCH 上承载；非周期 CSI 通常由网络触发并通过 PUSCH 上报。
-
-### 2.8 CE：Control Element
-
-CE 通常指 MAC Control Element，是 MAC 层控制信息。
-
-典型例子：
-
-- SCell Activation/Deactivation MAC CE
-- Timing Advance Command MAC CE
-- DRX Command MAC CE
-- BSR
-- PHR
-
-SCell 激活链路可以理解为：
+调制阶数：
 
 ```text
-eNB 构造 SCell Activation MAC CE
-        ↓
-放入 MAC PDU
-        ↓
-形成 DL-SCH Transport Block
-        ↓
-PHY 编码为 CW
-        ↓
-PDSCH 发送
-        ↓
-UE PDSCH 解码 + TB CRC
-        ↓ CRC OK
-MAC 解复用并识别 CE
-        ↓
-执行 SCell Activation
+QPSK=2
+16QAM=4
+64QAM=6
+256QAM=8 bit/symbol
 ```
 
-所以 `dedicated` 中已经添加 SCell，只说明 **SCell 已配置**，并不等于 **SCell 已激活**。
-
-### 2.9 HARQ / HarqId / RV
-
-HARQ = Hybrid ARQ。
-
-下行典型过程：
+当前指导资料的 zCAT 估算：
 
 ```text
-eNB 新传 TB
-   ↓
-UE CRC OK  → ACK → 结束
-UE CRC FAIL→ NACK
-   ↓
-eNB 重传（相同 HARQ process）
-   ↓
-UE 软合并后再次译码
+近似码率 = TBS / REs / Layer数 / Qm
 ```
 
-FDD LTE 下行通常有 8 个 HARQ process，因此分析某个 TB 的新传/重传时必须对齐 `HarqId`。
+例如 `195816/13600/2/8≈0.900`。仪表侧指导使用 `LTE_PHY_DATA_REQ/IND` 中 `A/UINT`，并以 0.93 作为当前测试配置检查阈值；这属于测试规则，不是所有 LTE 场景统一的协议硬限制。
 
-指导资料中的典型 RV 顺序：
+高 MCS 通常意味着更高调制/编码效率，也意味着更高 SINR/SNR 要求。因此 BLER 异常要同时看：
 
 ```text
-新传     RV=0
-第一次重传 RV=2
-第二次重传 RV=3
-第三次重传 RV=1
+SNR + MCS + Qm + TBS + RE + Layer
 ```
 
-实际是否发生全部重传取决于 ACK/NACK、网络配置和调度。
-
-### 2.10 ACK / NACK / DTX
-
-- ACK：接收端确认对应 HARQ TB 正确。
-- NACK：接收端完成接收但译码/CRC 未通过，请求重传。
-- DTX：期望存在反馈/传输，但没有检测到有效信号或有效反馈。
-
-因此：
+## 6. CSI：CQI、PMI、RI 如何影响下行
 
 ```text
-大量 NACK     → 优先检查数据解码质量
-大量 DTX      → 优先检查控制信道漏检、时序、上行反馈链路
-NACK/DTX 混合 → 两条链路都需要对齐排查
+参考信号
+→ UE信道估计
+→ CQI/PMI/RI
+→ PUCCH/PUSCH
+→ eNB Scheduler
+→ MCS/Rank/PMI
+→ PDSCH
+→ CRC/ACK/NACK
+→ 下一轮链路自适应
 ```
 
----
+- **CQI**：UE 对可支持下行传输效率的建议，不等于 MCS，也不等于 SNR。
+- **RI**：UE 推荐空间 Rank；实际 Rank 仍由调度决定。
+- **PMI**：在当前 Rank 下推荐预编码矩阵，不表示天线数量。
 
-## 3. TM、CW、Layer、TX/RX 的关系
+周期 CSI 常走 PUCCH，有 PUSCH 时可按配置复用；非周期 CSI 通常由网络触发并通过 PUSCH 上报。
 
-TM（Transmission Mode）规定 LTE 下行 PDSCH 的传输模式及相关参考信号/预编码行为。
-
-例如 TM4 用于闭环空间复用，可支持多 Layer 传输，并结合 RI/PMI/CQI 进行链路自适应。
-
-但不能使用：
+CSI 异常固定查：
 
 ```text
-TM4 → 直接判断当前一定 4 Layer
+RRC CSI配置
+→ UE是否生成CSI
+→ 应走PUCCH还是PUSCH
+→ 上行资源/TA/TX是否正常
+→ 仪表是否收到CSI
+→ CQI/RI/PMI是否与信道条件一致
+→ Scheduler实际Rank/MCS
+→ 最终PDSCH BLER
 ```
 
-正确逻辑是：
+## 7. 从搜网到 CA 的完整主流程
 
 ```text
-TM → 定义允许的传输机制
-CSI/RI/PMI → UE 给网络的信道建议
-Scheduler → 决定当前子帧实际调度
-PDSCH Log → 观察当前实际 TB/CW/Layer/MCS
+频点扫描
+→ PSS
+→ SSS/PCI
+→ PBCH/MIB
+→ PDCCH/SI-RNTI DCI
+→ PDSCH/SIB
+→ Msg1 PRACH
+→ Msg2 RAR
+→ Msg3 PUSCH
+→ Msg4 Contention Resolution
+→ RRC Connection
+→ NAS Attach/Service
+→ PDCCH/PDSCH/PUSCH业务
+→ CSI/HARQ闭环
+→ RRC Reconfiguration添加SCell
+→ Reconfiguration Complete
+→ SCell Activation MAC CE
+→ SCell Active
+→ PCC+SCC调度
 ```
 
-### TX 与 RX 怎么看
+异常定位原则：从异常点向前找它依赖的上一环，找到**最后一个确定成功点**和**第一个失败点**。
 
-`Tpmi` 不能直接确定 UE RX chain 数。
+## 8. 小区搜索与同步
 
-本文指导资料中：
-
-```text
-dwAntNum = 4
-```
-
-用于表示小区侧配置的 TX 天线数/天线端口相关配置。
-
-UE 实际 RX 路数应查看 RF/PHY RX chain Log，例如 RX0/RX1/RX2/RX3 是否启用及各链路 SNR/RSSI/RSRP。不能从 `2 Layer` 推导为 `2RX`。
-
----
-
-## 4. LTE 从开机到业务传输的 PHY 排查主线
-
-建议固定按以下顺序排查：
-
-```text
-1. 小区搜索/同步
-   ↓
-2. PBCH/MIB + 系统消息
-   ↓
-3. 随机接入 Msg1~Msg4
-   ↓
-4. RRC 建链
-   ↓
-5. PDCCH/DCI
-   ↓
-6. PDSCH 下行解码
-   ↓
-7. PUCCH HARQ/CSI/SR
-   ↓
-8. PUSCH 上行数据
-   ↓
-9. RRC Reconfiguration
-   ↓
-10. CA SCell 配置/激活
-   ↓
-11. CSI/测量/链路自适应
-```
-
-不要在随机接入尚未完成时直接从 SCell、吞吐量或 CSI 结果倒推。
-
----
-
-# 5. 小区搜索与同步
-
-常见 Log：
+常见：
 
 ```text
 Earcfn=1300
@@ -320,1085 +275,355 @@ RBNum=100
 dwAntNum=4
 ```
 
-含义：
+带宽：`1.4M=6RB, 3M=15RB, 5M=25RB, 10M=50RB, 15M=75RB, 20M=100RB`。
 
-| 字段 | 含义 |
-|---|---|
-| EARFCN | LTE 频点编号 |
-| CellID/PCI | Physical Cell ID |
-| RBNum | 下行带宽对应 PRB 数 |
-| dwAntNum | 平台记录的小区 TX/天线端口配置 |
+PSS 使用 `N_ID_2 = PCI mod 3`。PCI=1 时重点观察 Id1 PSS 峰值。
 
-常见带宽：
-
-| LTE 带宽 | PRB |
-|---|---:|
-| 1.4 MHz | 6 |
-| 3 MHz | 15 |
-| 5 MHz | 25 |
-| 10 MHz | 50 |
-| 15 MHz | 75 |
-| 20 MHz | 100 |
-
-### PSS 排查
-
-LTE PCI：
+搜不到小区：
 
 ```text
-PCI = 3 × N_ID_1 + N_ID_2
-N_ID_2 = PCI mod 3
+EARFCN
+→ RF功率/衰减
+→ PSS峰值
+→ SSS
+→ PCI
+→ PBCH/MIB CRC
+→ 频偏/时钟/同步
 ```
 
-所以 `PCI mod 3` 可用于确定对应 PSS 序列索引。
-
-如果：
-
-- 目标频点能量存在；
-- 对应 PSS 峰值仍很低；
-
-优先检查频点、功率、衰减、射频通路、频偏/时钟、仪表小区是否真正 ON AIR。
-
-如果 PSS 正常但搜不到小区，则继续查 SSS、PBCH/MIB 解码和同步状态。
-
----
-
-# 6. PBCH、MIB、SIB 与 PDCCH
-
-UE 完成 PSS/SSS 同步后，需要解 PBCH 获取 MIB，然后继续获取系统信息。
-
-关键依赖关系：
+## 9. PBCH、MIB、SIB、PDCCH、PDSCH
 
 ```text
-PSS/SSS
-  ↓
-PBCH/MIB
-  ↓
-PDCCH/DCI
-  ↓
-PDSCH
-  ↓
-SIB
+PSS/SSS成功
+→ PBCH/MIB成功
+→ PDCCH盲检
+→ 找到对应DCI
+→ 按DCI指示解PDSCH
+→ SIB CRC OK
 ```
 
-因此“没有 SIB”不一定是 SIB 内容问题，也可能是：
+无 SIB 至少分三类：PBCH/MIB 未解对、SIB DCI 漏检、DCI 正常但 PDSCH/SIB CRC FAIL。
 
-- PBCH/MIB 未正确解码；
-- PDCCH 未检出对应 DCI；
-- PDSCH CRC FAIL。
+当前平台 DCI 位图指导：`bit0 DCI0, bit3 SIB, bit5 Paging, bit7 RA, bit9 DCI3/3a, bit13 Other DCI, bit15 DCI4`。这是平台 Log 位图，不是 3GPP DCI format 的统一编码。
 
-指导资料中的 DCI 位图示例：
+## 10. 随机接入 Msg1~Msg4
 
 ```text
-bit0  : DCI0
-bit3  : DCI1A/1C SIB
-bit5  : DCI1A/1C Paging
-bit7  : DCI1A/1C RA
-bit9  : DCI3/3A
-bit13 : Other DCI
-bit15 : DCI4
+Msg1：UE发PRACH Preamble
+Msg2：eNB通过PDCCH+PDSCH发送RAR
+Msg3：UE按RAR中的UL Grant通过PUSCH发送
+Msg4：竞争解决
 ```
 
-例如：
+排查：
 
 ```text
-0x8    → bit3  → SIB 相关 DCI
-0x80   → bit7  → RA 相关 DCI
-0x2000 → bit13 → Other DCI
+无Msg1 → PRACH配置/occasion/UE是否进入RA/TX
+有Msg1无Msg2 → 仪表是否收到Preamble/是否发RAR/RA DCI/RAR PDSCH CRC
+RAR OK无Msg3 → RAR解析/UL Grant/TA/PUSCH TX
+Msg3后失败 → Msg4下行/竞争定时器/上行Msg3解码
 ```
 
-这同样属于该平台 Log 位图定义，不能视为 3GPP DCI format 的统一十六进制编码。
+当前指导资料 `wResult`: 1非竞争成功，2竞争成功，3竞争定时器超时，4 Preamble达到最大次数。
 
----
-
-# 7. 随机接入：Msg1 ~ Msg4
-
-## Msg1：PRACH Preamble
-
-UE 发送随机接入前导。
-
-异常：完全没有 Msg1。
-
-优先检查：
-
-- PRACH 配置是否正确；
-- UE 是否已经完成小区驻留；
-- 上行频率/功率/射频链路；
-- MAC 是否触发 RA。
-
-## Msg2：RAR
-
-网络通过下行发送 Random Access Response。
-
-RAR 中包含 UE 后续 Msg3 所需的重要信息，例如 UL Grant、Timing Advance、Temporary C-RNTI 等。
-
-如果仪表发 Msg2、UE 无 RAR：
+## 11. 下行 PDCCH→PDSCH→HARQ
 
 ```text
-先查 RA-RNTI 对应 PDCCH/DCI
-        ↓
-再查 RAR 所在 PDSCH CRC
+Scheduler生成DCI
+→ PDCCH
+→ UE Blind Decode
+→ 获得RB/MCS/HARQ ID/NDI/RV/MIMO信息
+→ UE解PDSCH
+→ TB0/TB1 CRC
+→ ACK/NACK
+→ PUCCH/PUSCH反馈
 ```
 
-不要直接判定为 MAC/RRC 问题。
+先看 DCI。当前指导资料中 `DtchCfg` 为发送 DCI 总数，`DtchInt` 为实际硬件中断数；两者明显不匹配优先怀疑 DCI 漏检。
 
-## Msg3
+再看 TB：`TBS2=0` 通常单 TB/CW，`TBS2!=0` 双 TB/CW。
 
-UE 根据 RAR 的 UL Grant 发送 Msg3，走 PUSCH。
+再看 Layer：读取 `Tpmi` 中 p/q，并只统计实际存在的 TB。
 
-异常时检查：
+再看 CRC：当前平台格式 `TbCrcHw=0x000m000m`。若当前版本定义 `2=CRC OK, 1=CRC FAIL`，则 `0x00020002` 两 TB 均成功，`0x00010002` 一个成功一个失败。持续如此，按 TB 计 BLER 会接近 50%。
 
-- UL Grant 是否正确收到；
-- TA 是否正确应用；
-- PUSCH 发射功率；
-- 仪表是否正确解 PUSCH；
-- UL HARQ 状态。
-
-## Msg4
-
-竞争随机接入中，网络完成 contention resolution。
-
-指导资料中的 `wResult`：
+HARQ 必须按：
 
 ```text
-1 = 非竞争接入成功
-2 = 竞争接入成功
-3 = 竞争定时器超时失败
-4 = Preamble 发送达到最大次数
+同CC + 同HarqId + 同TB/CW + NDI/RV
 ```
 
----
+对齐。FDD 下行通常 8 个 HARQ process；指导资料典型 RV 为新传0、重传2/3/1。
 
-# 8. 下行核心：PDCCH → DCI → PDSCH
-
-下行问题应拆成两个阶段：
+## 12. 下行 BLER 标准排查树
 
 ```text
-第一阶段：UE 有没有发现“这里有一包数据” → PDCCH/DCI
-第二阶段：发现以后能不能把数据解出来 → PDSCH/TB CRC
+DL BLER高
+├─ DCI正常？
+│  └─ 否：PDCCH/SNR/CCE/聚合级别/时序
+├─ 哪个CC？PCC/SCC1/SCC2
+├─ 哪个TB/CW失败？TB0/TB1/两者
+├─ 实际Rank/Layer？
+├─ RX0~RX3 SNR是否均衡？
+├─ MCS/Qm/TBS/RE是否过激？
+├─ 同HarqId重传能否恢复？
+└─ 是否固定某CW失败？
+   ├─ 是：MIMO/Layer/信道估计/预编码/RX链/配置
+   └─ 否：整体RF/SNR/MCS
 ```
 
-这两个问题不能混在一起。
+固定某 CW 无论新传重传都失败，与随机噪声造成的普通 BLER 特征不同，应重点查 MIMO 数据流、Layer mapping、预编码、参考信号/信道估计和 RX 链。
 
-## 8.1 DCI 漏检
+## 13. SNR 与 RX0~RX3
 
-指导资料中的统计：
+指导资料中一个载波通常两行 SNR：第一行 RX0/RX1，第二行 RX2/RX3；第一行可理解为 `[TX0→RX0, TX1→RX0, TX0→RX1, TX1→RX1]`。
+
+不要只看总 SNR：
 
 ```text
-DtchCfg = 配置/发送的 DCI 数
-DtchInt = 实际产生的硬件中断数，包括 CRC OK + CRC FAIL
+某RX长期异常低 → RF通路/天线/校准/接收链
+总SNR高但高Rank某CW固定失败 → MIMO检测/信道矩阵/Layer/预编码
 ```
 
-若仪表确实调度 DCI，而 UE `DtchInt` 明显缺失，应优先怀疑：
-
-- PDCCH 解码问题；
-- CCE/Aggregation Level；
-- RNTI；
-- 控制信道 SNR；
-- 搜索空间；
-- 时频同步；
-- DCI format/配置不匹配。
-
-## 8.2 PDSCH 解码
-
-确认 DCI 存在后，再看：
-
-- `TBS1/TBS2`
-- `MCS1/MCS2`
-- `HarqId`
-- `RV`
-- `Tpmi`
-- `TbCrcHw`
-- SNR
-
-### 判断几个 TB/CW
+## 14. ACK、NACK、DTX
 
 ```text
-TBS1 != 0, TBS2 = 0 → 通常 1 TB / 1 CW
-TBS1 != 0, TBS2 != 0 → 通常 2 TB / 2 CW
+ACK  = 对应HARQ数据正确并反馈成功
+NACK = TB CRC失败，请求重传
+DTX  = 期望有传输/反馈但没有检测到有效结果
 ```
 
-### 判断 Layer
+因此 NACK 多先查数据解码；DTX 多先查 DCI、PUCCH/PUSCH反馈、TA和同步；不要把 DTX 等价为 CRC FAIL。
 
-本文平台按：
+## 15. 上行完整流程
 
 ```text
-Tpmi = 0x0p0q00ab
+UE有数据
+→ 必要时SR
+→ eNB给UL Grant/DCI0
+→ UE MAC形成UL-SCH TB
+→ CRC/Turbo/Rate Matching
+→ 调制
+→ PUSCH
+→ eNB解码
+→ CRC OK/FAIL
+→ PHICH ACK/NACK
+→ 必要时HARQ重传
 ```
 
-解析每个 TB/CW 的 Layer 数。
-
-例如：
+异常顺序：
 
 ```text
-Tpmi = 0x02020422
+上行数据/BSR
+→ SR
+→ UL Grant
+→ DCI0解析
+→ PUSCH是否实际发射
+→ TA/上行同步
+→ UE TX功率
+→ 仪表PUSCH SNR
+→ 仪表ACK/NACK/DTX
+→ UE PHICH
+→ HARQ重传
 ```
 
-若 `TBS2 != 0`，则按指导资料为：
+当前指导资料中 UE PHY PHICH `value=1` 表示仪表对 PUSCH 返回 ACK。上行码率可按 `LTE_PHY_DATA_IND` 的 `A/UINT` 检查。
+
+## 16. PUCCH 会在哪些流程使用
+
+PUCCH 主要承载 UCI：HARQ-ACK、SR、周期 CQI，以及按配置承载 PMI/RI 等。
 
 ```text
-CW1 = 2 Layer
-CW2 = 2 Layer
-总计 = 4 Layer
+PDSCH CRC OK但仪表收到DTX → HARQ ACK反馈链
+UE有数据但拿不到UL Grant → SR链
+TM4链路自适应异常 → CSI反馈链
 ```
 
-### 判断 TB CRC
+PUCCH 异常查资源配置、PUCCH format、时序、TA、UE TX功率、仪表接收 SNR，以及是否与 PUSCH 复用。
 
-指导资料中：
+## 17. RRC Reconfiguration 与 PHY
+
+RRC Reconfiguration 可改变 TM、CSI 上报、PDSCH/PUSCH参数、SCell、测量和高阶调制等配置。
 
 ```text
-TbCrcHw = 0x000m000m
+仪表RRC CONNECTION RECONFIGURATION
+→ UE LTE_P_DEDICATED_CONFIG_REQ_EV
+→ 参数处理
+→ T_zEurrc_RRCConnectionReconfigurationComplete
 ```
 
-两个 `m` 分别表示两个 TB 的硬件 CRC/译码状态。
+仪表已发但 UE 无 Dedicated：偏下行/RRC接收；UE 收到但无 Complete：配置处理/能力/参数；UE 已打印 Complete 但仪表没收到：偏上行发送链。
 
-例如当前平台定义若确认：
+## 18. CA：SCell配置和激活不是一件事
 
 ```text
-2 = CRC OK
-1 = CRC FAIL
+PCC已连接
+→ RRC Reconfiguration
+→ Dedicated加入SCell
+→ UE建立SCell配置
+→ Reconfiguration Complete
+→ eNB发送SCell Activation MAC CE
+→ CE装入DL-SCH TB
+→ PDSCH
+→ UE TB CRC OK
+→ MAC解复用CE
+→ LTE_P_ACT_DEACT_SCELL_CTRL_ELEMNT_IND_EV
+→ SCell Active
+→ SCC开始调度
 ```
 
-则：
+因此 `Dedicated有SCell ≠ SCell已激活`。指导资料 `ActDeactSCellInfo=6=00000110b` 表示激活对应 SCC1/SCC2。
+
+仪表明确发送 CE 但 UE 无激活事件：
 
 ```text
-TbCrcHw=0x00020002 → TB1 OK + TB2 OK
-TbCrcHw=0x00010002 → 一个 TB FAIL + 一个 TB OK
+CE发送SFN.Subframe
+→ 对应MAC PDU/HARQ/TB
+→ UE同子帧DCI
+→ 对应TB CRC
+→ FAIL则追同HarqId重传
+→ 最终FAIL：CE无法交给MAC
+→ 最终CRC OK仍无事件：MAC解复用/CE解析/状态机
 ```
 
-如果连续大量双 TB 调度均固定为 `0x00010002`，并且自动化按每个 TB 分别统计，则理论表现就是约：
+仅凭 `TbCrcHw=0x00010002` 不能知道 CE 在哪个 TB；必须从仪表 MAC/PHY Trace 对齐。
+
+## 19. 50% BLER 与 SCell 不激活如何建立证据链
+
+双 TB 长期一个 OK、一个 FAIL 时，按 TB 次数统计约 50% BLER。如果 Activation CE 所在 MAC PDU 映射到持续失败 TB：
 
 ```text
-1 FAIL / 2 TB = 50% TB BLER
+仪表发送CE
+→ PDSCH确实发出
+→ UE对应TB CRC FAIL
+→ MAC拿不到正确TB
+→ 无法解析CE
+→ 无ACT_DEACT_SCELL事件
 ```
 
-这类固定 50% 不像随机弱信号造成的均匀误码，应重点检查是否存在固定 CW/Layer/天线链路、MCS/TBS、预编码或平台译码路径异常。
+这只是待验证假设。必须完成 `CE→MAC PDU→TB→HARQ→UE CRC` 对齐才能定根因。
 
-> 必须先核对当前软件版本 `TbCrcHw` 的状态枚举；如果 `1/2` 的定义不同，上述结论随之改变。
+## 20. SCC 上行能力
 
----
+当前指导资料在 `dedicated` 的 SCC common 配置查看 `UlConfigCtrlFlag=1`。实际 UL CA 数还受 UE Category/能力、Band Combination 和网络配置限制，不能从下行 SCC 数直接推导上行 CC 数。
 
-# 9. 下行 BLER 高的标准排查流程
+## 21. 测量流程
+
+PHY：`#INTRA#MEAS` 同频，`#INTER#MEAS` 异频；PS-PRIMARY：`LTE_P_INTRA_MEAS_IND_EV`、`LTE_P_INTER_MEAS_IND_EV`。
 
 ```text
-Measure 出现 NACK
-      ↓
-确认 PDCCH/DCI 是否收到
-      ↓ YES
-确认 PDSCH 对应 TB CRC
-      ↓ FAIL
-区分 TB1 / TB2 是否固定失败
-      ↓
-检查 HarqId + RV 重传链
-      ↓
-检查 SNR / 各 RX chain
-      ↓
-检查 MCS / TBS / RE / Code Rate
-      ↓
-检查 Rank / Layer / PMI / TM
-      ↓
-检查是否只在某 CC / CW / Layer 失败
+RRC Measurement Configuration
+→ PHY测量RSRP/RSRQ
+→ L1/L3过滤
+→ A1/A2/A3/A4/A5/B1/B2等事件判决
+→ TTT
+→ Measurement Report
 ```
 
-### 9.1 SNR
+无报告要区分：无 PHY 测量结果、测量有但门限/TTT未满足、事件满足但 RRC Report 未发。
 
-指导资料中每个载波可能有两行 SNR：
+## 22. 常见异常快速定位
+
+| 现象 | 第一检查 | 第二检查 | 第三检查 |
+|---|---|---|---|
+| 搜不到小区 | PSS/SSS | PBCH | RF功率/频偏 |
+| 有PSS无MIB | PBCH CRC | 信道/端口 | SNR |
+| 无SIB | SIB DCI | PDSCH CRC | SI配置 |
+| Msg1反复 | RAR | RA DCI | RAR PDSCH |
+| 有RAR无Msg3 | UL Grant/TA | PUSCH TX | UE状态 |
+| DL NACK高 | TB CRC | SNR/MCS | Layer/CW/HARQ |
+| DL DTX高 | DCI | PUCCH反馈 | TA/同步 |
+| 固定50% BLER | 两TB状态 | CW/Layer | MIMO/RX链 |
+| UL NACK高 | PUSCH SNR | UE TX功率 | MCS/TA |
+| UL DTX高 | PUSCH是否发 | Grant | 时序/TA |
+| TM4吞吐低 | RI/实际Rank | CQI/MCS | RX/SNR |
+| SCell配置未激活 | Activation CE | 对应TB CRC | MAC CE解析 |
+| SCell激活无数据 | SCC DCI | SCC PDSCH | CSI/调度 |
+| 无CSI | RRC CSI配置 | PUCCH/PUSCH | 仪表接收 |
+| CSI异常 | SNR | CQI/RI/PMI | Scheduler结果 |
+| 无测量报告 | PHY测量 | 门限/TTT | RRC Report |
+
+## 23. 分析一条 PDSCH Log 的固定顺序
 
 ```text
-第一行：RX0、RX1
-第二行：RX2、RX3
+1. CC index：PCC/SCC1/SCC2
+2. SFN.Subframe：哪个无线子帧
+3. DCI：调度是否被UE检测
+4. HarqId/NDI/RV：新传还是重传
+5. TBS1/TBS2：1TB还是2TB
+6. MCS1/MCS2：两个TB各自MCS
+7. Tpmi/Rank/Layer：每个CW几层、总Rank
+8. PMI：当前预编码
+9. SNR per RX：RX0~RX3是否正常
+10. TbCrcHw：哪个TB成功/失败
+11. HARQ follow-up：重传能否恢复
+12. 上层内容：普通数据、RRC还是MAC CE
 ```
 
-并进一步区分 TX→RX 组合，例如：
+这 12 步把 `TM/TX/RX/Layer/CW/TB/TBS/MCS/HARQ/CSI` 放进同一条因果链。
 
-```text
-SNR00 = TX0 → RX0
-SNR01 = TX1 → RX0
-SNR10 = TX0 → RX1
-SNR11 = TX1 → RX1
-```
+## 24. TM4 + 4RX + 双码字示例
 
-分析重点不是只看平均 SNR，而是检查是否存在某个 RX/TX 空间路径明显异常。
-
-如果一个 CW/Layer 长期失败，而某一路空间信道 SNR 同时显著异常，二者具有较强关联性。
-
-### 9.2 码率
-
-指导资料给出两种方法。
-
-仪表精确检查：
-
-```text
-LTE_PHY_DATA_REQ → 找 A、UINT
-Code Rate ≈ A / UINT
-```
-
-资料给出的经验门限：
-
-```text
-A / UINT <= 0.93
-```
-
-zCAT 估算：
-
-```text
-Code Rate ≈ TBS / REs / Layer数 / 调制阶数
-```
-
-例如：
-
-```text
-195816 / 13600 / 2 / 8 ≈ 0.900
-```
-
-其中调制阶数：
-
-```text
-QPSK   → 2 bit/symbol
-16QAM  → 4
-64QAM  → 6
-256QAM → 8
-```
-
-估算只能用于快速定位，精确判断应以实际 RE 分配、编码参数及仪表 PHY 数据为准。
-
----
-
-# 10. 为什么固定 50% BLER 要特别关注 CW/Layer
-
-假设当前持续：
+假设：
 
 ```text
 TM4
-TBS1 != 0
-TBS2 != 0
-Tpmi = 0x02020422
-TbCrcHw = 0x00010002
-```
-
-若平台定义确认 `1=FAIL, 2=OK`，则意味着：
-
-```text
-2 TB / 2 CW
-CW1 → 2 Layer
-CW2 → 2 Layer
-其中一个 TB/CW 长期 FAIL
-```
-
-自动化按 TB 统计时：
-
-```text
-每次调度 2 TB
-每次固定失败 1 TB
-BLER ≈ 50%
-```
-
-排查优先级：
-
-1. 确认到底固定 TB1 还是 TB2 FAIL。
-2. 对齐 `MCS1/MCS2`、`TBS1/TBS2`。
-3. 对齐 Rank/Layer/PMI。
-4. 检查 RX0~RX3 SNR 是否存在固定坏路。
-5. 降 Rank，例如从 4 Layer 降到 2 Layer，观察 BLER 是否消失。
-6. 降 MCS，观察失败 CW 是否恢复。
-7. 改预编码/PMI 或仪表 MIMO 配置进行交叉验证。
-8. 检查仪表端口、RF cable、衰减器及 UE RF chain。
-
-这比单纯把问题归为“信号差”更有定位价值。
-
----
-
-# 11. HARQ 重传怎么跟
-
-必须使用相同 `HarqId` 跟踪同一个 HARQ process。
-
-例如：
-
-```text
-SF x     HarqId=2 RV=0 CRC FAIL
-SF x+8   HarqId=2 RV=2 CRC FAIL
-SF x+16  HarqId=2 RV=3 CRC OK
-```
-
-说明：
-
-```text
-新传失败
-第一次重传失败
-第二次重传成功
-```
-
-不能仅看到第一次 `CRC FAIL` 就统计为最终业务丢包；HARQ 的意义就是允许 PHY/MAC 通过重传和软合并恢复数据。
-
-但测试仪表的 BLER 指标可能按初传 BLER、每次传输 BLER 或最终 HARQ 失败分别统计，因此必须确认自动化指标口径。
-
----
-
-# 12. PDSCH CRC 与 HARQ ACK/NACK 为什么可能对不上
-
-理论链路：
-
-```text
-PDSCH TB CRC OK   → UE 生成 ACK
-PDSCH TB CRC FAIL → UE 生成 NACK
-```
-
-但仪表最终看到的反馈还经过：
-
-```text
-TB CRC
- ↓
-HARQ feedback generation
- ↓
-PUCCH/PUSCH UCI
- ↓
-UE RF TX
- ↓
-无线信道
- ↓
-eNB/仪表解调
-```
-
-因此可能出现：
-
-```text
-UE 本地 CRC OK
-但仪表解成 NACK/DTX
-```
-
-这时不能再把根因归到 PDSCH，应转查上行 HARQ feedback。
-
-重点检查：
-
-- PUCCH resource；
-- ACK/NACK bundling/multiplexing；
-- FDD/TDD feedback timing；
-- TA；
-- UL power；
-- PUCCH SNR；
-- CA 场景下 HARQ feedback 配置。
-
----
-
-# 13. 上行：PUSCH 与 PHICH
-
-上行主链路：
-
-```text
-UL Grant（DCI 0）
-   ↓
-UE 形成 UL-SCH TB
-   ↓
-PUSCH
-   ↓
-eNB 解码
-   ↓
-PHICH ACK/NACK
-```
-
-指导资料中 PHY Log 的 PHICH `value=1` 表示 ACK，则意味着对应 PUSCH 被仪表/eNB 正确解码。
-
-上行误码高时按顺序检查：
-
-```text
-是否收到正确 UL Grant
-      ↓
-PUSCH 是否按正确 RB/MCS 发射
-      ↓
-TA 是否正常
-      ↓
-UE TX Power 是否正常
-      ↓
-仪表 PUSCH SNR/EVM
-      ↓
-仪表 UL HARQ ACK/NACK/DTX
-      ↓
-同 HarqId 的重传情况
-```
-
-仪表可进一步检查：
-
-```text
-Measure_BTSx_PHYMAC(UL_HARQ).csv
-```
-
-观察 ACK/NACK/DTX。
-
-上行码率可按指导资料通过：
-
-```text
-LTE_PHY_DATA_IND → A / UINT
-```
-
-进行检查。
-
----
-
-# 14. PUCCH：HARQ、SR、CSI 的关键出口
-
-PUCCH 是很多“看起来像下行问题、实际是上行控制问题”的根源。
-
-常见承载：
-
-- HARQ ACK/NACK
-- SR（Scheduling Request）
-- CQI/PMI/RI 等 UCI
-
-因此出现以下现象时要查 PUCCH：
-
-```text
-UE 本地 PDSCH CRC OK，但仪表看到 DTX
-CSI 长期不上报
-SR 发出但网络侧检测不到
-CA 激活后 HARQ feedback 异常
-```
-
-重点参数：
-
-- PUCCH resource index；
-- PUCCH format；
-- UCI bit 数；
-- ACK/NACK 与 CSI 是否碰撞；
-- SR/CSI 周期；
-- TA；
-- UL power control；
-- 仪表是否正确检测 PUCCH。
-
----
-
-# 15. CSI 异常排查
-
-CSI 问题不要只看 CQI 一个字段。
-
-完整链路：
-
-```text
-UE 接收参考信号
-   ↓
-信道估计
-   ↓
-计算 CQI / PMI / RI
-   ↓
-按 RRC 配置的周期/触发条件生成 CSI
-   ↓
-PUCCH 或 PUSCH 上报
-   ↓
-eNB/仪表接收
-   ↓
-Scheduler 根据 CSI 调整 MCS/Rank/PMI
-```
-
-## 15.1 没有 CSI
-
-按顺序检查：
-
-1. RRC `dedicated` 是否配置 CQI/CSI reporting。
-2. 周期、offset、resource 是否有效。
-3. 到上报子帧时 UE 是否生成 CSI。
-4. CSI 是走 PUCCH 还是 PUSCH。
-5. UE 本地已经生成，但仪表是否收到。
-6. 是否因 UCI 冲突、DRX、measurement gap、上行失步等被影响。
-
-## 15.2 CQI 明显异常
-
-检查：
-
-- 下行 SNR/SINR；
-- CRS 信道估计；
-- RX chain 是否缺路；
-- 干扰；
-- CQI 配置是 wideband 还是 subband；
-- 256QAM 能力/配置；
-- CQI 与实际 MCS 是否长期严重背离。
-
-## 15.3 RI 异常
-
-例如仪表配置 4x4 MIMO，但 UE 长期只报 RI=1：
-
-优先检查：
-
-- 4 条 RX/空间信道是否真的有效；
-- MIMO channel correlation；
-- 某 RX chain SNR 是否异常；
-- TM 是否支持目标空间复用；
-- UE capability；
-- RI reporting 配置。
-
-RI 低本身不代表故障；在高相关信道环境下 Rank=1 可能是合理结果。
-
-## 15.4 PMI 异常
-
-如果 PMI 固定、跳变异常或与仪表预期不一致，检查：
-
-- Rank 是否变化；
-- CSI codebook 配置；
-- 天线端口配置；
-- 信道矩阵；
-- UE 是否正确完成 channel estimation；
-- 仪表 MIMO fading/channel model。
-
----
-
-# 16. CA：PCC、SCC 与 SCell
-
-常见 Log 中：
-
-```text
-ccIdx=0 → PCC/PCell
-ccIdx=1 → 第一个 SCC/SCell
-ccIdx=2 → 第二个 SCC/SCell
-```
-
-具体编号仍以平台定义为准。
-
-CA 建立不是一步完成：
-
-```text
-PCell 已连接
-   ↓
-RRC Connection Reconfiguration
-   ↓
-SCell dedicated configuration
-   ↓
-UE Reconfiguration Complete
-   ↓
-SCell 已配置，但未必激活
-   ↓
-SCell Activation MAC CE
-   ↓
-UE MAC 正确收到并处理
-   ↓
-SCell Active
-   ↓
-SCell 上开始实际调度
-```
-
----
-
-# 17. SCell 配置成功但不激活
-
-指导资料中的 UE 事件：
-
-```text
-LTE_P_ACT_DEACT_SCELL_CTRL_ELEMNT_IND_EV
-```
-
-仪表已发送 Activation CE，但 UE 没有该事件时，不应直接判定“UE MAC 不支持”。
-
-完整排查链：
-
-```text
-仪表确认发送 SCell Activation MAC CE
-             ↓
-找到 CE 所在 MAC PDU
-             ↓
-找到承载该 MAC PDU 的 DL-SCH TB
-             ↓
-记录 SFN.Subframe + HarqId + TB/CW index
-             ↓
-UE 查对应 DCI/PDSCH
-             ↓
-对应 TB CRC 是否 OK？
-       ├─ NO → 跟 HARQ 重传
-       │        ↓
-       │      最终仍 FAIL → PHY 下行问题
-       │
-       └─ YES → MAC 是否解复用出 Activation CE？
-                    ↓
-                 无事件 → MAC CE 解析/处理问题
-```
-
-## 17.1 为什么 `TbCrcHw=0x00010002` 与 SCell 不激活可能有关
-
-如果当前是两个 TB，并且固定一个 TB FAIL：
-
-```text
-TbCrcHw = 0x00010002
-```
-
-那么 Activation CE 如果恰好被放入持续失败的那个 TB，UE 就无法拿到该 MAC PDU，自然不会产生 SCell Activation 的 MAC 处理事件。
-
-但是，仅凭 `0x00010002` **不能证明 Activation CE 就在失败 TB**。
-
-必须从仪表 Trace 确定：
-
-```text
-Activation CE
-  → 哪个 MAC PDU
-  → 哪个 TB
-  → 哪个 HARQ process
-  → 哪个 SFN/Subframe
-```
-
-再与 UE Log 对齐。
-
-这是确认因果关系的关键步骤。
-
-## 17.2 ActDeactSCellInfo
-
-指导资料示例：
-
-```text
-ActDeactSCellInfo = 6
-6 = 0b00000110
-```
-
-对应 bit 置位的 SCell 被激活，因此示例表示激活 SCC1、SCC2。
-
-Ci：
-
-```text
-Ci = 1 → 激活对应 sCellIndex
-Ci = 0 → 去激活对应 sCellIndex
-```
-
----
-
-# 18. 上行 CA
-
-LTE 上行 CA 能力、Band Combination 和网络配置需要同时满足。
-
-指导资料的平台 Log 可在 SCC `dedicated/common` 配置中检查：
-
-```text
-UlConfigCtrlFlag = 1
-```
-
-用于判断该 SCC 是否配置上行。
-
-如果只有 UL 1CC，通常由 PCell 承载；配置 UL CA 后，再检查对应 SCell 是否真正获得 UL Grant 并发送 PUSCH。
-
----
-
-# 19. RRC Reconfiguration 排查
-
-仪表：
-
-```text
-RRC CONNECTION RECONFIGURATION
-```
-
-UE：
-
-```text
-LTE_P_DEDICATED_CONFIG_REQ_EV
-```
-
-完成：
-
-```text
-T_zEurrc_RRCConnectionReconfigurationComplete
-```
-
-仪表最终应收到：
-
-```text
-RRC CONNECTION RECONFIGURATION COMPLETE
-```
-
-定位逻辑：
-
-```text
-仪表发 Reconfiguration
-      ↓
-UE 没 LTE_P_DEDICATED_CONFIG_REQ_EV
-      → 优先下行：DCI/PDSCH/RLC/RRC 接收链
-
-UE 收到 dedicated
-但没有 ReconfigurationComplete
-      → 配置处理/能力/参数问题
-
-UE 已生成 ReconfigurationComplete
-仪表没收到
-      → 优先上行：UL Grant/PUSCH/RLC/RRC 发送链
-```
-
-同时排除：
-
-```text
-EL2_EURRC_RADIOLINK_FAIL_IND_EV
-```
-
-避免把 RLF 后果误判为单纯重配失败。
-
----
-
-# 20. 测量：RSRP 与同频/异频
-
-指导资料中的 PHY 搜索关键字：
-
-```text
-#INTRA#MEAS → 同频测量
-#INTER#MEAS → 异频测量
-```
-
-PS-PRIMARY：
-
-```text
-LTE_P_INTRA_MEAS_IND_EV
-LTE_P_INTER_MEAS_IND_EV
-```
-
-可以检查：
-
-- PCell；
-- SCell；
-- 同频邻区；
-- 异频邻区；
-- PCI；
-- RSRP/RSRQ 等。
-
-测量异常按链路定位：
-
-```text
-目标频点是否配置
-  ↓
-measurement object 是否存在
-  ↓
-measurement gap 是否需要/是否配置
-  ↓
-PHY 是否实际执行测量
-  ↓
-是否搜到目标 PCI
-  ↓
-L1 measurement
-  ↓
-L3 filtering
-  ↓
-RRC event A1/A2/A3/A4/A5/Bx 条件
-  ↓
-Measurement Report
-```
-
----
-
-# 21. NACK、DTX、NACK/DTX 的快速分流
-
-## 大量 NACK
-
-优先：
-
-```text
-PDSCH/PUSCH 实际解码失败
-→ SNR
-→ MCS/TBS/Code Rate
-→ MIMO Layer/PMI
-→ RF chain
-→ HARQ 重传
-```
-
-## 大量 DTX
-
-下行 HARQ feedback 场景优先：
-
-```text
-UE 是否收到 DCI/PDSCH
-→ UE 是否生成 ACK/NACK
-→ PUCCH/PUSCH UCI
-→ TA
-→ UL Power
-→ 仪表是否检测到反馈
-```
-
-控制信道场景：
-
-```text
-DCI 是否漏检
-→ PDCCH SNR
-→ RNTI/Search Space/CCE
-```
-
-## NACK/DTX
-
-先分别证明：
-
-```text
-PDSCH CRC 是否失败？
-DCI 是否收到？
-UE 是否生成 HARQ feedback？
-仪表是否正确收到 feedback？
-```
-
-不要仅凭 Measure 一列 `NACK/DTX` 定义根因。
-
----
-
-# 22. 典型问题：自动化 BLER 50%，SCell 不激活
-
-假设现场：
-
-```text
-TM4
-SCell dedicated 已下发并处理完成
-仪表确认发送 SCell Activation CE
-UE 无 LTE_P_ACT_DEACT_SCELL_CTRL_ELEMNT_IND_EV
+dwAntNum=4
+RX0/RX1/RX2/RX3开启
+TBS1=195816
+TBS2=195816
 Tpmi=0x02020422
-TbCrcHw 后续持续 0x00010002
-自动化 DL BLER≈50%
+TbCrcHw=0x00010002
 ```
 
-推荐排查：
-
-### Step 1：确认 TB 数
-
-检查同一批子帧：
+解析：
 
 ```text
-TBS1 != 0 ?
-TBS2 != 0 ?
+TM4 → 允许闭环空间复用
+4TX配置 → 发射侧有对应多天线/端口能力
+4RX → UE有4条接收链
+TBS1/TBS2非0 → 2TB → 2CW
+Tpmi 2+2 → CW0占2Layer，CW1占2Layer → 实际Rank4
+TbCrcHw 10002 → 按当前平台定义一个TB OK、一个FAIL
+持续如此 → 约50% TB BLER
+→ 重点查固定失败CW对应Layer、MIMO信道、RX链、预编码、MCS/TBS及HARQ
 ```
 
-如果两个均有效，确认是 2 TB / 2 CW。
-
-### Step 2：确认固定失败的是哪个 TB
-
-核对当前版本 `TbCrcHw` 位域定义，确定：
+## 25. 四层证据法
 
 ```text
-TB1 = FAIL / TB2 = OK
+第一层 配置证据：RRC/SIB/Dedicated
+TM、CA、CSI、测量、能力
+
+第二层 调度证据：DCI/Scheduler/PHY DATA REQ
+RB、MCS、TBS、HARQ、Rank
+
+第三层 空口PHY证据：PSS/PBCH/PDCCH/PDSCH/PUCCH/PUSCH
+SNR、RX、CRC、ACK/NACK/DTX
+
+第四层 协议结果：RRC Complete/MAC CE/SCell Active/Measurement Report/吞吐
 ```
 
-还是反过来。
+不要只凭第四层“结果没出现”判断模块故障。应向前找到最后一个成功层和第一个失败层。
 
-### Step 3：确认是否确实为 4 Layer
-
-按当前平台 `Tpmi` 解析，并与实际 Rank/调度信息交叉验证。
-
-### Step 4：检查失败是否与 CW 固定绑定
-
-连续统计：
+## 26. 建议学习顺序
 
 ```text
-TB1 BLER
-TB2 BLER
+1 OFDM / RE / RB / Subframe
+2 PSS / SSS / PBCH / MIB
+3 PDCCH / DCI / RNTI
+4 PDSCH / TB / TBS / CW
+5 MCS / QPSK / QAM / 编码率
+6 HARQ / NDI / RV / ACK/NACK/DTX
+7 MIMO：TX/RX / Rank / Layer / Precoding
+8 TM1~TM10
+9 CSI：CQI / PMI / RI
+10 PUCCH / SR / UCI
+11 PUSCH / UL Grant / PHICH
+12 Random Access
+13 RRC Reconfiguration
+14 CA / SCell
+15 Measurement
 ```
 
-而不是只看总 BLER。
-
-如果结果接近：
-
-```text
-TB1 ≈ 100%
-TB2 ≈ 0%
-```
-
-则总 BLER 自然约为 50%。
-
-### Step 5：做 MIMO 降阶交叉验证
-
-仪表将 Rank/Layer 降低，例如 4 Layer → 2 Layer。
-
-若问题立即消失，重点转向：
-
-- 4x4 MIMO 空间链路；
-- RX chain；
-- PMI/precoding；
-- 特定 CW/Layer 解调；
-- 仪表 MIMO 端口连接。
-
-### Step 6：找到 Activation CE 对应 TB
-
-仪表 Trace：
-
-```text
-SCell Activation CE
-→ MAC PDU
-→ LTE_PHY_DATA_REQ / DL-SCH
-→ TB index
-→ HarqId
-→ SFN.Subframe
-```
-
-### Step 7：UE 对齐
-
-在相同：
-
-```text
-SFN.Subframe
-HarqId
-TB index
-```
-
-查看 `TbCrcHw`。
-
-### Step 8：跟完重传
-
-如果初传 FAIL，继续跟同一 HarqId 的 RV=2/3/1。
-
-只有最终都无法正确解码，才能形成：
-
-```text
-Activation CE 所在 TB 最终解码失败
-        ↓
-UE MAC 没收到 CE
-        ↓
-没有 ACT_DEACT_SCELL event
-        ↓
-SCell 未激活
-```
-
-如果最终 CRC OK 但仍无 MAC CE event，则问题从 PHY 转移到 MAC CE 解复用/处理。
-
----
-
-# 23. 建议固定使用的 Log 对齐键
-
-跨仪表、PHY、MAC、RRC 分析时，不要只按打印时间肉眼对应。
-
-优先记录：
-
-| 层级 | 对齐字段 |
-|---|---|
-| Radio Frame | SFN + Subframe |
-| CA | CC index / PCell / SCell index |
-| HARQ | HarqId |
-| 重传 | RV / NDI |
-| TB | TB index + TBS |
-| CW | CW index |
-| MIMO | Rank/Layer/PMI |
-| 调制编码 | MCS + modulation |
-| PHY 结果 | TB CRC |
-| 控制信道 | DCI format/RNTI |
-| RRC | transaction identifier / message sequence |
-
-最有效的故障证据通常是一条完整时间链，而不是单个字段截图。
-
----
-
-# 24. 分层定位原则
-
-最终建议把 LTE 问题固定拆成以下边界：
-
-```text
-RF
-│  功率、频偏、链路、RX/TX chain
-▼
-PHY Sync
-│  PSS/SSS/PBCH
-▼
-PHY Control
-│  PDCCH/DCI/PHICH
-▼
-PHY Data
-│  PDSCH/PUSCH/TB CRC/HARQ
-▼
-MAC
-│  HARQ process / MAC CE / scheduling
-▼
-RLC
-│  segmentation/reassembly/retransmission
-▼
-RRC
-│  configuration/measurement/connection
-▼
-NAS/IP/Application
-```
-
-定位时必须先证明故障发生在哪一层边界：
-
-- **没有 DCI**：不要先分析 PDSCH TB。
-- **DCI 有、TB CRC FAIL**：优先 PHY 数据链路。
-- **TB CRC OK、没有 MAC CE event**：优先 MAC 解复用/处理。
-- **UE 已发 RRC Complete、仪表没收到**：优先上行链路。
-- **UE 本地 ACK、仪表 DTX**：优先 PUCCH/PUSCH feedback，而不是重新查 PDSCH。
-
-这套方法可以把“小区没起来、吞吐低、50% BLER、SCell 不激活、CSI 异常、重配失败”等表象统一到同一条可验证的协议链路上。
+按此顺序学习，目标不是记字段，而是看到异常后沿物理链路找到第一个失败点。
