@@ -71,12 +71,42 @@ const labels = {
   <div id="decrypted-content" class="hidden"></div>
 </div>
 
+
+<style is:global>
+  /* 超长加密正文的渲染节流。
+     正文是解锁后一次性注入的，本文最大的一篇有 18000+ 个节点、页面高 17 万 px，
+     iOS Safari 渲染这种长页时会因内存被系统杀掉标签页。content-visibility 让浏览器
+     只渲染视口附近的块；contain-intrinsic-size 用 auto，浏览器会记住每块首次渲染后的
+     真实高度，所以目录锚点跳转和阅读进度条不会长期失准。
+     只作用于解密注入的正文，普通文章的渲染路径不受影响。 */
+  #decrypted-content > * {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 1200px;
+  }
+
+  /* 标题会被逐级包成嵌套 section（这篇有 279 个），再收一层，
+     免得某个顶层大节一进视口就要整块渲染 */
+  #decrypted-content section section {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 300px;
+  }
+
+  /* 表格是节点大户（本文 95 张表、近 5000 个单元格），单独再收一层 */
+  #decrypted-content table {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 400px;
+  }
+</style>
+
 <script is:inline>
 (function() {
   var ITERATIONS = 100000;
   var SALT_LEN = 16;
   var IV_LEN = 12;
   var TAG_LEN = 16;
+  // 每帧搬进文档的顶层节点数。正文顶层是按 h2 切开的 section，
+  // 分帧插入是为了摊平样式和布局的峰值，而不是一帧算完整篇。
+  var CHUNK_SIZE = 4;
 
   var container = document.getElementById('encrypted-container');
   if (!container) return;
@@ -84,6 +114,12 @@ const labels = {
   var encryptedData = container.getAttribute('data-encrypted');
   var slug = container.getAttribute('data-slug');
   var cacheKey = 'pw:' + slug;
+  // 渲染中标记：注入开始时写、整篇落地后清。
+  // iOS Safari 内存不足会直接杀掉标签页并自动重载，重载后若还留着缓存密码，
+  // 就会立刻再解密注入、再被杀，表现为页面永远在刷新且回不到密码界面。
+  // 加载时发现这个标记还在，说明上一次没渲染完就崩了，于是清掉缓存退回密码界面，
+  // 不再自动重试，把死循环断开。
+  var pendingKey = 'pw-pending:' + slug;
 
   var ui = document.getElementById('password-ui');
   var form = document.getElementById('password-form');
@@ -91,10 +127,13 @@ const labels = {
   var errorEl = document.getElementById('password-error');
   var contentEl = document.getElementById('decrypted-content');
 
-  function showContent(html) {
-    contentEl.innerHTML = html;
-    contentEl.classList.remove('hidden');
-    ui.classList.add('hidden');
+  // Safari 无痕模式下 sessionStorage 的读写会直接抛异常
+  function ssGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+  function ssSet(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* 无痕模式忽略 */ } }
+  function ssDel(k) { try { sessionStorage.removeItem(k); } catch (e) { /* 无痕模式忽略 */ } }
+
+  // 正文全部落地后的收尾：跑内联脚本、解除断路器、通知其它组件重建
+  function finishContent() {
     // Scripts injected via innerHTML are inert — re-create them so they execute
     var scripts = contentEl.querySelectorAll('script');
     for (var i = 0; i < scripts.length; i++) {
@@ -106,6 +145,10 @@ const labels = {
       ns.textContent = old.textContent;
       old.parentNode.replaceChild(ns, old);
     }
+
+    // 整篇已经渲染完，解除断路器
+    ssDel(pendingKey);
+
     // Re-init components after content is in DOM
     setTimeout(function() {
       document.dispatchEvent(new CustomEvent('password:decrypted'));
@@ -115,9 +158,9 @@ const labels = {
     var placeholders = contentEl.querySelectorAll('.lqip-placeholder');
     for (var i = 0; i < placeholders.length; i++) {
       (function(placeholder) {
-        var container = placeholder.parentElement;
-        if (!container) return;
-        var img = container.querySelector('img');
+        var wrap = placeholder.parentElement;
+        if (!wrap) return;
+        var img = wrap.querySelector('img');
         if (!img) return;
         if (img.complete && img.naturalWidth > 0) {
           img.style.opacity = '1';
@@ -133,6 +176,69 @@ const labels = {
         }
       })(placeholders[i]);
     }
+  }
+
+  function showContent(html) {
+    ssSet(pendingKey, '1');
+
+    // 先在游离的 template 里解析：这一步不触发样式计算和布局。
+    // 再按帧把顶层节点搬进文档，避免一次性提交上万个节点的布局。
+    var tpl = document.createElement('template');
+    tpl.innerHTML = html;
+
+    var nodes = [];
+    while (tpl.content.firstChild) {
+      nodes.push(tpl.content.removeChild(tpl.content.firstChild));
+    }
+
+    contentEl.classList.remove('hidden');
+    ui.classList.add('hidden');
+
+    var i = 0;
+    var done = false;
+
+    // count 传 null 表示把剩下的一次性插完
+    function flush(count) {
+      var frag = document.createDocumentFragment();
+      var end = count === null ? nodes.length : Math.min(i + count, nodes.length);
+      for (; i < end; i++) frag.appendChild(nodes[i]);
+      contentEl.appendChild(frag);
+    }
+
+    function finish() {
+      if (done) return;
+      done = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+      finishContent();
+    }
+
+    // 后台标签页不绘制，rAF 会停摆、定时器被节流到秒级，分帧只会让正文迟迟落不了地
+    // （断路器标记也就一直挂着）。而此时本来就没有渲染开销可摊，直接插完即可。
+    function onVisibility() {
+      if (document.hidden && !done) {
+        flush(null);
+        finish();
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility);
+
+    function step() {
+      if (document.hidden) {
+        flush(null);
+        finish();
+        return;
+      }
+
+      flush(CHUNK_SIZE);
+
+      if (i < nodes.length) {
+        requestAnimationFrame(step);
+      } else {
+        finish();
+      }
+    }
+
+    step();
   }
 
   function showError() {
@@ -185,7 +291,7 @@ const labels = {
     if (!pwd) return;
     hideError();
     decrypt(pwd).then(function(html) {
-      sessionStorage.setItem(cacheKey, pwd);
+      ssSet(cacheKey, pwd);
       showContent(html);
     }).catch(function() {
       showError();
@@ -193,13 +299,19 @@ const labels = {
   });
 
   // Try cached password
-  var cached = sessionStorage.getItem(cacheKey);
+  var cached = ssGet(cacheKey);
   if (cached) {
-    decrypt(cached).then(function(html) {
-      showContent(html);
-    }).catch(function() {
-      sessionStorage.removeItem(cacheKey);
-    });
+    if (ssGet(pendingKey)) {
+      // 上一次自动解锁没渲染完就崩了，清掉缓存停在密码界面，不再自动重试
+      ssDel(pendingKey);
+      ssDel(cacheKey);
+    } else {
+      decrypt(cached).then(function(html) {
+        showContent(html);
+      }).catch(function() {
+        ssDel(cacheKey);
+      });
+    }
   }
 })();
 </script>
