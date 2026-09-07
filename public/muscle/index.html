@@ -2,91 +2,100 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<meta name="theme-color" content="#050b12" />
-<title>3D 人体肌群模型</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<meta name="theme-color" content="#06101b" />
+<title>3D 人体肌群图谱</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050b12;color:#edf8ff;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}body{background:radial-gradient(circle at 20% 10%,#0b3150 0,transparent 30%),radial-gradient(circle at 82% 30%,#152346 0,transparent 30%),linear-gradient(180deg,#08131f,#03070c)}#scene{width:100%;height:100%;display:block;touch-action:none}.hud{position:fixed;inset:0;pointer-events:none}.brand{position:absolute;left:14px;top:max(14px,env(safe-area-inset-top));padding:10px 13px;border:1px solid #6ee3ff2d;border-radius:14px;background:#071522bd;backdrop-filter:blur(14px);box-shadow:0 8px 30px #0007}.brand b{font-size:15px}.brand small{display:block;margin-top:5px;color:#9ccfe3;font-size:11px}.panel{position:absolute;right:14px;top:max(14px,env(safe-area-inset-top));width:min(360px,42vw);padding:16px;border:1px solid #72deff35;border-radius:18px;background:#071522cc;backdrop-filter:blur(16px);box-shadow:0 10px 40px #0008}.tag{font-size:10px;color:#68dcff;letter-spacing:1.5px}.name{margin-top:8px;font-size:clamp(24px,3.8vw,40px);font-weight:800;line-height:1.05;text-shadow:0 0 18px #5fdfff4d}.sub{margin-top:7px;font-size:13px;color:#b8ddeb}.desc{margin-top:10px;padding-top:10px;border-top:1px solid #73dfff20;color:#c4dce8;font-size:12px;line-height:1.55}.legend{position:absolute;left:14px;bottom:max(14px,env(safe-area-inset-bottom));padding:9px 11px;border-radius:12px;background:#071522a8;border:1px solid #63dbff22;color:#a9cddd;font-size:11px}@media(max-width:760px){.panel{left:12px;right:12px;top:auto;bottom:max(12px,env(safe-area-inset-bottom));width:auto;padding:13px}.name{font-size:26px}.desc{font-size:11px}.legend{display:none}.brand{left:12px}.brand small{max-width:230px}.panel{max-height:31vh;overflow:hidden}}
+:root{--bg:#050a12;--panel:rgba(7,18,31,.82);--line:rgba(103,210,255,.22);--text:#eef9ff;--muted:#9bb8c8;--accent:#63ddff;--hot:#ff685f}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}body{background:radial-gradient(circle at 18% 10%,#0b3d5e55,transparent 34%),radial-gradient(circle at 80% 30%,#162c6650,transparent 32%),linear-gradient(180deg,#081522,#03070d)}#scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}.hud{position:fixed;inset:0;pointer-events:none}.top{position:absolute;left:12px;right:12px;top:max(10px,env(safe-area-inset-top));display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.brand,.toolbar,.panel,.searchbox,.loading-card{border:1px solid var(--line);background:rgba(6,17,29,.72);backdrop-filter:blur(14px);box-shadow:0 12px 40px #0006,0 0 28px #37cfff12}.brand{padding:10px 12px;border-radius:15px}.brand b{font-size:15px;letter-spacing:.4px}.brand span{display:block;margin-top:4px;font-size:11px;color:var(--muted)}.toolbar{display:flex;gap:6px;padding:6px;border-radius:14px;pointer-events:auto}.btn{border:1px solid #73d7ff24;background:#0b2034b0;color:#dff7ff;border-radius:10px;padding:8px 10px;font-size:12px;white-space:nowrap}.btn:active{transform:scale(.97)}.left{position:absolute;left:12px;top:max(76px,calc(env(safe-area-inset-top) + 76px));width:min(330px,32vw);display:flex;flex-direction:column;gap:10px;pointer-events:auto}.searchbox{border-radius:15px;padding:9px}.searchbox input{width:100%;border:0;outline:0;border-radius:10px;padding:10px 11px;background:#03101ddd;color:#effaff;font-size:14px}.results{display:none;margin-top:7px;max-height:280px;overflow:auto}.results.show{display:block}.result{display:block;width:100%;text-align:left;border:0;border-top:1px solid #ffffff10;background:transparent;color:#dff6ff;padding:9px 8px}.result small{display:block;color:#86a8ba;margin-top:3px}.panel{position:absolute;right:12px;top:max(76px,calc(env(safe-area-inset-top) + 76px));width:min(380px,34vw);max-height:calc(100vh - 100px - env(safe-area-inset-bottom));overflow:auto;border-radius:19px;padding:15px;pointer-events:auto}.eyebrow{font-size:10px;letter-spacing:1.4px;color:#72dfff}.name{margin-top:8px;font-size:30px;line-height:1.12;font-weight:800}.en{margin-top:5px;font-size:13px;color:#8edbff}.latin{margin-top:4px;font-size:11px;color:#7893a3;font-style:italic}.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}.chip{padding:5px 8px;border:1px solid #76ddff20;border-radius:999px;background:#ffffff06;color:#b9d5e4;font-size:11px}.sec{margin-top:13px;padding-top:12px;border-top:1px solid #75d9ff18}.sec h3{margin:0 0 6px;font-size:11px;letter-spacing:.7px;color:#7edfff}.sec p{margin:0;color:#b7cbd7;font-size:12px;line-height:1.65}.mesh{word-break:break-all;color:#7596a7;font-size:10px}.hint{position:absolute;left:12px;bottom:max(10px,env(safe-area-inset-bottom));padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:#061321a8;color:#8ca9b9;font-size:11px;backdrop-filter:blur(12px)}.tooltip{position:fixed;z-index:5;display:none;pointer-events:none;transform:translate(12px,12px);padding:7px 9px;border:1px solid #74dcff42;border-radius:9px;background:#061321e8;color:#e9f9ff;font-size:12px;box-shadow:0 6px 24px #0008}.loading{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:#030910d9;backdrop-filter:blur(8px);transition:.25s}.loading.hide{opacity:0;visibility:hidden}.loading-card{width:min(430px,calc(100vw - 28px));padding:17px;border-radius:18px}.loading-card b{font-size:17px}.loading-card p{margin:8px 0 0;color:#9db9c9;font-size:12px;line-height:1.6}.bar{height:8px;margin-top:12px;border-radius:999px;overflow:hidden;background:#ffffff0d}.bar i{display:block;width:0;height:100%;background:linear-gradient(90deg,#48d6ff,#6b7dff);transition:width .2s}.credit{margin-top:12px;padding-top:10px;border-top:1px solid #ffffff10;color:#6f8d9e;font-size:10px;line-height:1.5}.credit a{color:#7bdfff;text-decoration:none}
+@media(max-width:850px){.brand span{display:none}.brand{padding:9px 10px}.toolbar{gap:4px}.btn{padding:7px 8px;font-size:11px}.left{top:max(64px,calc(env(safe-area-inset-top) + 64px));width:calc(100vw - 24px)}.searchbox{padding:7px}.results{max-height:180px}.panel{left:10px;right:10px;top:auto;bottom:max(10px,env(safe-area-inset-bottom));width:auto;max-height:36vh;padding:12px;border-radius:17px}.name{font-size:24px}.sec{margin-top:9px;padding-top:8px}.sec p{font-size:11px;line-height:1.5}.chips{margin-top:8px}.hint{display:none}.credit{display:none}}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/"}}</script>
 </head>
 <body>
 <canvas id="scene"></canvas>
-<div class="hud"><div class="brand"><b>3D 人体肌群图谱</b><small>单指旋转 · 双指缩放 · 点击肌肉查看名称</small></div><div class="panel"><div class="tag">ANATOMY SCAN</div><div class="name" id="name">选择肌肉</div><div class="sub" id="sub">可旋转查看正面、侧面与背面</div><div class="desc" id="desc">模型包含胸、肩、臂、背、核心、臀腿和小腿的主要训练肌群。</div></div><div class="legend">彩色隆起区域均可点击 · 点击空白取消锁定</div></div>
+<div class="hud">
+  <div class="top">
+    <div class="brand"><b>3D 人体肌群图谱</b><span>真实解剖 Mesh · 点击任意肌肉查看名称与功能</span></div>
+    <div class="toolbar">
+      <button class="btn" id="front">正面</button><button class="btn" id="back">背面</button><button class="btn" id="reset">全身</button><button class="btn" id="spin">旋转：关</button>
+    </div>
+  </div>
+  <div class="left">
+    <div class="searchbox"><input id="search" placeholder="搜索肌肉，如：斜方肌 / deltoid" autocomplete="off"/><div class="results" id="results"></div></div>
+  </div>
+  <aside class="panel">
+    <div class="eyebrow">ANATOMICAL MUSCLE INSPECTOR</div>
+    <div class="name" id="name">加载人体模型中…</div>
+    <div class="en" id="en">Z-Anatomy muscular system</div>
+    <div class="latin" id="latin"></div>
+    <div class="chips"><span class="chip" id="side">侧别：—</span><span class="chip" id="system">肌肉系统</span></div>
+    <div class="sec"><h3>简介</h3><p id="intro">模型加载后，点击任意肌肉查看详细信息。</p></div>
+    <div class="sec"><h3>功能</h3><p id="func">—</p></div>
+    <div class="sec"><h3>模型节点</h3><p class="mesh" id="mesh">—</p></div>
+    <div class="credit">模型：<a href="https://github.com/Z-Anatomy/Models-of-human-anatomy" target="_blank">Z-Anatomy</a>（CC BY-SA 4.0，源自 BodyParts3D）<br>浏览器优化 GLB / 中文解剖数据参考：Liyucheng1997/242_lab-human-anatomy</div>
+  </aside>
+  <div class="hint">拖动旋转 · 双指缩放/平移 · 点击肌肉锁定 · 搜索可直接定位</div>
+</div>
+<div class="tooltip" id="tip"></div>
+<div class="loading" id="loading"><div class="loading-card"><b id="loadTitle">正在加载真实人体肌肉模型</b><p id="loadText">首次加载约 9 MB，iPhone 蜂窝网络可能需要几秒。</p><div class="bar"><i id="bar"></i></div></div></div>
 <script type="module">
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-const canvas=document.getElementById('scene');
-const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;
-const scene=new THREE.Scene();scene.fog=new THREE.Fog(0x050b12,8,18);
-const camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,.1,100);camera.position.set(0,1.15,8.8);
-const controls=new OrbitControls(camera,canvas);controls.enableDamping=true;controls.dampingFactor=.075;controls.minDistance=4.4;controls.maxDistance=12;controls.target.set(0,.2,0);controls.enablePan=false;
-scene.add(new THREE.HemisphereLight(0xb9eaff,0x142032,2.5));const k=new THREE.DirectionalLight(0xffffff,2.8);k.position.set(4,7,6);scene.add(k);const r=new THREE.DirectionalLight(0x4f7cff,2);r.position.set(-5,4,-5);scene.add(r);
-const grid=new THREE.GridHelper(12,24,0x19789c,0x112a3b);grid.position.y=-3.15;grid.material.opacity=.22;grid.material.transparent=true;scene.add(grid);
-const ring=new THREE.Mesh(new THREE.TorusGeometry(2.25,.018,8,100),new THREE.MeshBasicMaterial({color:0x58dbff,transparent:true,opacity:.3}));ring.rotation.x=Math.PI/2;ring.position.y=-3.12;scene.add(ring);
-const body=new THREE.Group();scene.add(body);const hit=[];
-const skin=new THREE.MeshPhysicalMaterial({color:0x384556,roughness:.72,metalness:.03,transparent:true,opacity:.68});
-const colors={chest:0xf05c65,shoulder:0xff9d57,arm:0xffca67,core:0x67c8ff,back:0x6e7dff,glute:0xb678ff,quad:0xff7e6b,ham:0x7f86ff,calf:0x52d6cb,fore:0xf2c46f,neck:0xd886ff};
-function mat(c){return new THREE.MeshPhysicalMaterial({color:c,emissive:new THREE.Color(c).multiplyScalar(.17),emissiveIntensity:.5,roughness:.38,metalness:.06,clearcoat:.28})}
-function ell(x,y,z,p,rot=[0,0,0],material=skin){const m=new THREE.Mesh(new THREE.SphereGeometry(1,28,20),material);m.scale.set(x,y,z);m.position.set(...p);m.rotation.set(...rot);body.add(m);return m}
-function cap(rad,len,p,rot=[0,0,0],material=skin){const m=new THREE.Mesh(new THREE.CapsuleGeometry(rad,len,8,18),material);m.position.set(...p);m.rotation.set(...rot);body.add(m);return m}
-function muscle(name,sub,desc,c,scale,p,rot=[0,0,0]){const m=ell(scale[0],scale[1],scale[2],p,rot,mat(c));m.userData={name,sub,desc,baseScale:m.scale.clone(),baseEmissive:m.material.emissiveIntensity};hit.push(m);return m}
-function pair(fn){fn(-1);fn(1)}
-// Human silhouette
-ell(.48,.61,.42,[0,2.72,0]);cap(.18,.3,[0,2.15,0]);ell(.93,1.22,.5,[0,.95,0]);ell(.67,.54,.45,[0,-.32,0]);
-pair(s=>{cap(.25,1.05,[s*1.08,.92,0],[0,0,s*.08]);cap(.19,.95,[s*1.22,-.05,.02],[0,0,s*.035]);ell(.2,.23,.15,[s*1.25,-.72,.06]);cap(.32,1.35,[s*.42,-1.24,0],[0,0,s*.015]);cap(.22,1.16,[s*.42,-2.45,.02]);ell(.27,.12,.55,[s*.42,-3.09,.19]);});
-// Neck
-pair(s=>muscle('胸锁乳突肌','颈部前外侧','参与颈部屈曲、旋转与侧屈。',colors.neck,[.11,.38,.10],[s*.22,2.24,.19],[0,0,s*.28]));
-// Chest
-pair(s=>muscle('胸大肌','胸部','主要完成肩关节水平内收；卧推、俯卧撑、夹胸重点训练。',colors.chest,[.43,.36,.18],[s*.42,1.38,.46],[.05,0,s*.13]));
-pair(s=>muscle('胸大肌锁骨部','上胸','肩关节屈曲与水平内收；上斜卧推常用于强调该区域。',0xff7b82,[.39,.18,.16],[s*.4,1.68,.43],[.1,0,s*.10]));
-// Serratus & obliques
-pair(s=>muscle('前锯肌','胸廓外侧','使肩胛骨前伸和上回旋；推类动作与肩胛控制中参与。',0x59c8ff,[.18,.48,.15],[s*.76,.75,.35],[0,0,s*.18]));
-pair(s=>muscle('腹外斜肌','腹部外侧','参与躯干旋转、侧屈及核心稳定。',colors.core,[.25,.7,.16],[s*.48,.12,.38],[0,0,s*.08]));
-// Abs
-muscle('腹直肌','腹部前侧','负责躯干屈曲并帮助维持骨盆与躯干稳定。',0x4fd6ff,[.31,.72,.14],[0,.38,.49]);
-// Shoulder 3 heads
-pair(s=>muscle('三角肌前束','肩前侧','主要参与肩屈曲与水平内收。',colors.shoulder,[.22,.35,.22],[s*.91,1.54,.30],[0,0,s*.26]));
-pair(s=>muscle('三角肌中束','肩外侧','主要负责肩关节外展；侧平举重点训练。',0xffaf55,[.24,.38,.25],[s*1.02,1.48,.02],[0,0,s*.06]));
-pair(s=>muscle('三角肌后束','肩后侧','主要参与肩水平外展与伸展；反向飞鸟等动作重点训练。',0xff875e,[.22,.34,.2],[s*.94,1.48,-.30],[0,0,-s*.22]));
-// Upper arm
-pair(s=>muscle('肱二头肌','大臂前侧','主要负责屈肘与前臂旋后；弯举类动作重点训练。',colors.arm,[.18,.48,.17],[s*1.08,.82,.23],[0,0,s*.05]));
-pair(s=>muscle('肱肌','大臂前外侧','强力屈肘肌，位于肱二头肌深层并从外侧部分可见。',0xffdd78,[.11,.31,.12],[s*1.19,.64,.16],[0,0,s*.08]));
-pair(s=>muscle('肱三头肌','大臂后侧','主要负责伸肘；臂屈伸、下压、窄距推举重点训练。',0xffb05f,[.2,.52,.17],[s*1.09,.82,-.23],[0,0,s*.04]));
-// Forearm
-pair(s=>muscle('前臂屈肌群','前臂掌侧','参与屈腕、屈指和握力。',colors.fore,[.14,.46,.13],[s*1.22,-.08,.17],[0,0,s*.03]));
-pair(s=>muscle('前臂伸肌群','前臂背侧','参与伸腕、伸指并稳定腕关节。',0xe3a958,[.13,.46,.12],[s*1.23,-.08,-.16],[0,0,s*.03]));
-// Back
-pair(s=>muscle('斜方肌上束','上背/颈肩','肩胛骨上提与上回旋。',colors.back,[.34,.48,.15],[s*.30,1.72,-.43],[0,0,-s*.2]));
-pair(s=>muscle('斜方肌中下束','中上背','参与肩胛骨后缩、下压与稳定。',0x7588ff,[.38,.68,.13],[s*.28,1.03,-.50],[0,0,s*.08]));
-pair(s=>muscle('菱形肌','肩胛骨内侧','主要使肩胛骨后缩并帮助稳定肩胛骨。',0x8f7dff,[.23,.38,.11],[s*.34,1.31,-.55],[0,0,-s*.08]));
-pair(s=>muscle('背阔肌','背部外侧','主要完成肩关节伸展、内收与内旋；引体、下拉、划船重点训练。',0x586fff,[.45,.82,.18],[s*.58,.60,-.45],[0,0,-s*.16]));
-pair(s=>muscle('竖脊肌','脊柱两侧','参与脊柱伸展、抗屈曲和姿势稳定。',0x55a7ff,[.14,.85,.11],[s*.18,.30,-.53],[0,0,0]));
-// Glutes
-pair(s=>muscle('臀中肌','臀部上外侧','髋外展与骨盆稳定；单腿支撑时非常重要。',0xc47bff,[.32,.42,.23],[s*.45,-.43,-.28],[0,0,-s*.15]));
-pair(s=>muscle('臀大肌','臀部后侧','髋伸展和外旋的主要肌肉；深蹲、硬拉、臀推重点训练。',colors.glute,[.42,.48,.28],[s*.37,-.63,-.43],[0,0,s*.05]));
-// Thigh anterior
-pair(s=>muscle('股直肌','大腿前侧中央','股四头肌之一，主要伸膝并参与屈髋。',colors.quad,[.18,.66,.18],[s*.42,-1.30,.31],[0,0,0]));
-pair(s=>muscle('股外侧肌','大腿前外侧','股四头肌外侧部分，主要负责伸膝。',0xff916e,[.20,.70,.18],[s*.56,-1.34,.23],[0,0,s*.06]));
-pair(s=>muscle('股内侧肌','大腿前内侧','股四头肌内侧部分，伸膝并参与髌骨稳定。',0xffb087,[.17,.55,.16],[s*.29,-1.49,.27],[0,0,-s*.08]));
-pair(s=>muscle('内收肌群','大腿内侧','主要完成髋内收并参与髋关节稳定。',0xf48b9a,[.16,.67,.15],[s*.27,-1.30,.07],[0,0,s*.04]));
-// Hamstrings
-pair(s=>muscle('股二头肌','大腿后外侧','腘绳肌外侧部分，参与屈膝与髋伸展。',colors.ham,[.19,.69,.17],[s*.54,-1.34,-.27],[0,0,s*.04]));
-pair(s=>muscle('半腱肌/半膜肌','大腿后内侧','腘绳肌内侧部分，参与屈膝、髋伸展和小腿内旋。',0x6979e8,[.18,.68,.16],[s*.31,-1.35,-.30],[0,0,-s*.04]));
-// Lower leg
-pair(s=>muscle('胫骨前肌','小腿前侧','主要负责踝背屈和足内翻；步行跑步中参与抬脚。',0x5ccfe7,[.12,.55,.11],[s*.42,-2.42,.22],[0,0,0]));
-pair(s=>muscle('腓肠肌','小腿后侧上部','小腿三头肌表层，主要完成跖屈，并参与屈膝。',colors.calf,[.18,.52,.17],[s*.42,-2.35,-.20],[0,0,0]));
-pair(s=>muscle('比目鱼肌','小腿后侧深层','主要负责踝跖屈，屈膝位提踵时参与更明显。',0x4bbdb5,[.15,.43,.13],[s*.42,-2.66,-.16],[0,0,0]));
-// interaction
-const nameEl=document.getElementById('name'),subEl=document.getElementById('sub'),descEl=document.getElementById('desc');const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();let hovered=null,selected=null,down={x:0,y:0};
-function setInfo(m){nameEl.textContent=m.userData.name;subEl.textContent=m.userData.sub;descEl.textContent=m.userData.desc}
-function reset(m){if(!m)return;m.scale.copy(m.userData.baseScale);m.material.emissiveIntensity=m.userData.baseEmissive}
-function hi(m,strong=false){m.scale.copy(m.userData.baseScale).multiplyScalar(strong?1.07:1.035);m.material.emissiveIntensity=strong?1.4:.9}
-function point(e){const q=canvas.getBoundingClientRect();mouse.x=(e.clientX-q.left)/q.width*2-1;mouse.y=-(e.clientY-q.top)/q.height*2+1;ray.setFromCamera(mouse,camera);return ray.intersectObjects(hit,false)[0]?.object||null}
-canvas.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY}});
-canvas.addEventListener('pointermove',e=>{if(selected)return;const m=point(e);if(m!==hovered){reset(hovered);hovered=m;if(m){hi(m);setInfo(m)}}});
-canvas.addEventListener('pointerup',e=>{if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>8)return;const m=point(e);reset(selected);reset(hovered);selected=m;hovered=m;if(m){hi(m,true);setInfo(m)}else{nameEl.textContent='选择肌肉';subEl.textContent='旋转模型后点击彩色肌肉';descEl.textContent='正面和背面均包含可交互肌群。'}});
-const pos=new Float32Array(750);for(let i=0;i<pos.length;i++)pos[i]=(Math.random()-.5)*(i%3===1?9:15);const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pos,3));const particles=new THREE.Points(pg,new THREE.PointsMaterial({color:0x65dfff,size:.025,transparent:true,opacity:.35}));scene.add(particles);
-function animate(t){requestAnimationFrame(animate);controls.update();particles.rotation.y=t*.00002;ring.rotation.z=t*.00016;renderer.render(scene,camera)}requestAnimationFrame(animate);
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
+
+const MODEL_URLS=[
+ 'https://cdn.jsdelivr.net/gh/Liyucheng1997/242_lab-human-anatomy@main/public/models/muscular.glb',
+ 'https://raw.githubusercontent.com/Liyucheng1997/242_lab-human-anatomy/main/public/models/muscular.glb'
+];
+const META_URL='https://cdn.jsdelivr.net/gh/Liyucheng1997/242_lab-human-anatomy@main/src/anatomy.json';
+const canvas=document.getElementById('scene'),loading=document.getElementById('loading'),bar=document.getElementById('bar'),loadTitle=document.getElementById('loadTitle'),loadText=document.getElementById('loadText');
+const nameEl=document.getElementById('name'),enEl=document.getElementById('en'),latinEl=document.getElementById('latin'),sideEl=document.getElementById('side'),systemEl=document.getElementById('system'),introEl=document.getElementById('intro'),funcEl=document.getElementById('func'),meshEl=document.getElementById('mesh'),tip=document.getElementById('tip');
+const search=document.getElementById('search'),results=document.getElementById('results');
+
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
+const scene=new THREE.Scene();scene.fog=new THREE.Fog(0x06101b,8,24);
+const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.05,100);camera.position.set(0,2.8,8);
+const controls=new OrbitControls(camera,canvas);controls.enableDamping=true;controls.dampingFactor=.065;controls.enablePan=true;controls.minDistance=1.7;controls.maxDistance=16;controls.target.set(0,2.6,0);
+scene.add(new THREE.HemisphereLight(0xe8fbff,0x142238,1.65));const key=new THREE.DirectionalLight(0xffffff,2.4);key.position.set(4,8,7);scene.add(key);const rim=new THREE.DirectionalLight(0x70a4ff,1.5);rim.position.set(-5,4,-7);scene.add(rim);const fill=new THREE.DirectionalLight(0x74dfff,.8);fill.position.set(-3,1,5);scene.add(fill);
+const grid=new THREE.GridHelper(12,30,0x1b7ca3,0x123145);grid.material.transparent=true;grid.material.opacity=.2;scene.add(grid);
+const ring=new THREE.Mesh(new THREE.TorusGeometry(2.1,.012,8,96),new THREE.MeshBasicMaterial({color:0x54dfff,transparent:true,opacity:.2}));ring.rotation.x=Math.PI/2;ring.position.y=.015;scene.add(ring);
+
+let DATA={},BY_SANITIZED=new Map(),root=null,meshes=[],records=[],selected=null,hovered=null,wholeBox=null,wholeCenter=new THREE.Vector3(),wholeSize=new THREE.Vector3();
+const ray=new THREE.Raycaster(),pointer=new THREE.Vector2();
+function sanitize(s){return String(s||'').replace(/\s/g,'_').replace(/[[\].:/]/g,'').replace(/_+/g,'_').replace(/^_+|_+$/g,'')}
+function buildIndex(){BY_SANITIZED=new Map();for(const k of Object.keys(DATA))BY_SANITIZED.set(sanitize(k),k)}
+function clean(n){return sanitize(String(n||'').replace(/[*]/g,'').trim().toLowerCase())}
+const SIDE='lrjmsg',SIDE_ZH={l:'左',r:'右'};
+function resolve(s){if(BY_SANITIZED.has(s))return{key:BY_SANITIZED.get(s),side:''};const digits=(s.match(/\d+$/)||[''])[0];for(let n=digits.length;n>=1;n--){const cut=s.slice(0,s.length-n);if(BY_SANITIZED.has(cut))return{key:BY_SANITIZED.get(cut),side:''};const last=cut.slice(-1);if(SIDE.includes(last)&&BY_SANITIZED.has(cut.slice(0,-1)))return{key:BY_SANITIZED.get(cut.slice(0,-1)),side:last}}const tail=s.slice(-1);if(SIDE.includes(tail)&&BY_SANITIZED.has(s.slice(0,-1)))return{key:BY_SANITIZED.get(s.slice(0,-1)),side:tail};return null}
+function lookup(raw){let s=clean(raw),hit=resolve(s);if(!hit){const d=s.match(/^(.*)_\d+$/);if(d)hit=resolve(d[1])}if(!hit)return{zh:null,en:String(raw||'').replace(/_\d+$/,'').replace(/[lrjmsg]?\d+$/,'').replace(/_/g,' ').trim(),la:null,sys:'肌肉系统',intro:null,func:null,side:''};const e=DATA[hit.key]||{};return{...e,side:SIDE_ZH[hit.side]||''}}
+
+function cloneMaterials(o){if(!o.material)return;o.material=Array.isArray(o.material)?o.material.map(m=>m.clone()):o.material.clone();const arr=Array.isArray(o.material)?o.material:[o.material];o.userData._base=arr.map(m=>({c:m.color?.clone(),e:m.emissive?.clone(),ei:m.emissiveIntensity??1}));arr.forEach(m=>{if('metalness'in m)m.metalness=0;if('roughness'in m&&m.roughness===1)m.roughness=.62})}
+function restore(o){if(!o?.userData?._base)return;const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach((m,i)=>{const b=o.userData._base[i];if(b?.c&&m.color)m.color.copy(b.c);if(b?.e&&m.emissive)m.emissive.copy(b.e);if('emissiveIntensity'in m)m.emissiveIntensity=b?.ei??1});o.scale.setScalar(1)}
+function glow(o,strong=false){if(!o)return;const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach(m=>{if(m.emissive){m.emissive.setHex(strong?0xff584f:0xffae45);m.emissiveIntensity=strong?.75:.38}});o.scale.setScalar(strong?1.012:1.006)}
+function showInfo(o){if(!o){nameEl.textContent='未选择肌肉';enEl.textContent='点击模型上的肌肉';latinEl.textContent='';sideEl.textContent='侧别：—';systemEl.textContent='肌肉系统';introEl.textContent='拖动人体旋转，点击任意肌肉即可查看。';funcEl.textContent='—';meshEl.textContent='—';return}const x=o.userData.info||lookup(o.name);o.userData.info=x;nameEl.textContent=x.zh||x.en||o.name;enEl.textContent=x.en||o.name;latinEl.textContent=x.la||'';sideEl.textContent='侧别：'+(x.side||'未区分');systemEl.textContent=x.sys||'肌肉系统';introEl.textContent=x.intro||'该结构已可点击，当前中文简介未收录。';funcEl.textContent=x.func||'—';meshEl.textContent=o.name||o.uuid}
+function selectMesh(o,focus=false){if(selected&&selected!==o)restore(selected);selected=o;if(o){glow(o,true);showInfo(o);if(focus)focusMesh(o)}else showInfo(null)}
+function focusMesh(o){const b=new THREE.Box3().setFromObject(o),c=new THREE.Vector3(),s=new THREE.Vector3();b.getCenter(c);b.getSize(s);controls.target.copy(c);const dir=camera.position.clone().sub(controls.target).normalize();const d=Math.max(2.2,Math.min(4.5,Math.max(s.x,s.y,s.z)*6));camera.position.copy(c.clone().add(dir.multiplyScalar(d)));controls.update()}
+function setPointer(x,y){const r=canvas.getBoundingClientRect();pointer.x=(x-r.left)/r.width*2-1;pointer.y=-(y-r.top)/r.height*2+1}
+function hit(){ray.setFromCamera(pointer,camera);return ray.intersectObjects(meshes,false)[0]?.object||null}
+
+let down=null;canvas.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,t:performance.now()}});canvas.addEventListener('pointerup',e=>{if(!down)return;const d=Math.hypot(e.clientX-down.x,e.clientY-down.y),dt=performance.now()-down.t;down=null;if(d>8||dt>600)return;setPointer(e.clientX,e.clientY);selectMesh(hit(),false)});canvas.addEventListener('pointermove',e=>{if(e.pointerType==='touch'||selected)return;setPointer(e.clientX,e.clientY);const o=hit();if(o===hovered)return;if(hovered&&hovered!==selected)restore(hovered);hovered=o;if(o){glow(o,false);const x=o.userData.info||lookup(o.name);tip.textContent=(x.zh||x.en||o.name);tip.style.left=e.clientX+'px';tip.style.top=e.clientY+'px';tip.style.display='block';canvas.style.cursor='pointer'}else{tip.style.display='none';canvas.style.cursor='default'}});canvas.addEventListener('pointerleave',()=>{if(hovered&&hovered!==selected)restore(hovered);hovered=null;tip.style.display='none'});
+
+function wholeView(back=false){if(!wholeBox)return;controls.target.copy(wholeCenter);const h=wholeSize.y,w=wholeSize.x;const dist=Math.max(h*1.15,w*1.8);camera.position.set(0,wholeCenter.y+(h*.02),back?-dist:dist);controls.update()}
+document.getElementById('front').onclick=()=>wholeView(false);document.getElementById('back').onclick=()=>wholeView(true);document.getElementById('reset').onclick=()=>{selectMesh(null);wholeView(false)};document.getElementById('spin').onclick=e=>{controls.autoRotate=!controls.autoRotate;controls.autoRotateSpeed=.8;e.currentTarget.textContent='旋转：'+(controls.autoRotate?'开':'关')};
+
+function buildSearch(){records=meshes.map(m=>{const info=m.userData.info||lookup(m.name);m.userData.info=info;return{mesh:m,info,text:[info.zh,info.en,info.la,m.name].filter(Boolean).join(' ').toLowerCase()}})}
+function renderResults(q){q=q.trim().toLowerCase();if(!q){results.classList.remove('show');results.innerHTML='';return}const seen=new Set(),arr=[];for(const r of records){if(!r.text.includes(q))continue;const label=(r.info.zh||r.info.en||r.mesh.name)+'|'+(r.info.side||'');if(seen.has(label))continue;seen.add(label);arr.push(r);if(arr.length>=10)break}results.innerHTML='';arr.forEach(r=>{const b=document.createElement('button');b.className='result';b.innerHTML=`${r.info.zh||r.info.en||r.mesh.name}<small>${r.info.en||r.mesh.name}${r.info.side?' · '+r.info.side:''}</small>`;b.onclick=()=>{selectMesh(r.mesh,true);search.value=r.info.zh||r.info.en||r.mesh.name;results.classList.remove('show')};results.appendChild(b)});results.classList.toggle('show',arr.length>0)}
+search.addEventListener('input',()=>renderResults(search.value));search.addEventListener('focus',()=>renderResults(search.value));
+
+async function loadMeta(){try{const r=await fetch(META_URL,{cache:'force-cache'});if(!r.ok)throw new Error(r.status);DATA=await r.json();buildIndex()}catch(e){console.warn('metadata unavailable',e);DATA={};buildIndex()}}
+function prepareModel(g){root=g;scene.add(root);meshes=[];root.traverse(o=>{if(o.isMesh&&o.material){cloneMaterials(o);meshes.push(o)}});let b=new THREE.Box3().setFromObject(root),s=new THREE.Vector3();b.getSize(s);const scale=5.9/s.y;root.scale.setScalar(scale);root.updateMatrixWorld(true);b=new THREE.Box3().setFromObject(root);const c=new THREE.Vector3();b.getCenter(c);root.position.x-=c.x;root.position.z-=c.z;root.position.y-=b.min.y;root.updateMatrixWorld(true);wholeBox=new THREE.Box3().setFromObject(root);wholeBox.getCenter(wholeCenter);wholeBox.getSize(wholeSize);controls.minDistance=Math.max(1.4,wholeSize.y*.28);controls.maxDistance=wholeSize.y*3;ring.scale.setScalar(Math.max(.7,wholeSize.x/3));buildSearch();wholeView(false);showInfo(null);loading.classList.add('hide')}
+const draco=new DRACOLoader();draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/libs/draco/');const loader=new GLTFLoader();loader.setDRACOLoader(draco);
+function loadModel(i=0){if(i>=MODEL_URLS.length){loadTitle.textContent='人体模型加载失败';loadText.textContent='两个模型源均无法访问，请稍后刷新或检查网络。';bar.style.width='100%';return}loader.load(MODEL_URLS[i],g=>prepareModel(g.scene),xhr=>{if(xhr.total){bar.style.width=(xhr.loaded/xhr.total*100).toFixed(1)+'%';loadText.textContent=`正在下载模型 ${(xhr.loaded/1048576).toFixed(1)} / ${(xhr.total/1048576).toFixed(1)} MB`}else loadText.textContent=`正在下载模型 ${(xhr.loaded/1048576).toFixed(1)} MB`},()=>loadModel(i+1))}
+(async()=>{await loadMeta();loadModel()})();
+function animate(t){requestAnimationFrame(animate);controls.update();ring.rotation.z=t*.00014;if(selected)glow(selected,true);renderer.render(scene,camera)}requestAnimationFrame(animate);
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2))});
-</script></body></html>
+</script>
+</body>
+</html>
