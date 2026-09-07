@@ -8,6 +8,9 @@
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#06101c;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:#eaf8ff}body{background:radial-gradient(circle at 20% 15%,#08395b 0,transparent 32%),radial-gradient(circle at 80% 35%,#073a32 0,transparent 28%),linear-gradient(180deg,#081421,#040911)}#app,canvas{width:100%;height:100%;display:block}.hud{position:fixed;inset:0;pointer-events:none}.title{position:absolute;top:max(12px,env(safe-area-inset-top));left:12px;padding:10px 13px;border:1px solid #5edfff33;border-radius:14px;background:#071524a8;backdrop-filter:blur(12px);box-shadow:0 0 25px #00bfff16}.title b{font-size:16px;letter-spacing:.5px}.title span{display:block;margin-top:5px;font-size:11px;color:#b6d9e8aa}.panel{position:absolute;right:12px;top:max(12px,env(safe-area-inset-top));width:min(350px,42vw);padding:16px;border:1px solid #5edfff38;border-radius:18px;background:#071524c4;backdrop-filter:blur(14px);box-shadow:0 0 30px #00bfff16}.tag{font-size:10px;letter-spacing:1.4px;color:#71dbff}.name{margin-top:9px;font-size:clamp(25px,4vw,42px);font-weight:760;text-shadow:0 0 18px #4fdcff55}.sub{margin-top:5px;font-size:13px;color:#b9e6f6}.desc{margin-top:12px;padding-top:11px;border-top:1px solid #73ddff24;font-size:12px;line-height:1.55;color:#cde8f3bb}.hint{position:absolute;left:12px;bottom:max(12px,env(safe-area-inset-bottom));font-size:11px;color:#bfdfecaa;padding:9px 11px;border-radius:12px;border:1px solid #6fdcff22;background:#07152496;backdrop-filter:blur(10px)}@media(max-width:780px){.panel{left:12px;right:12px;top:auto;bottom:max(12px,env(safe-area-inset-bottom));width:auto;padding:13px}.name{font-size:28px}.desc{font-size:11px;margin-top:8px;padding-top:8px}.hint{display:none}.title span{max-width:220px}.title{padding:9px 11px}}
 </style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/"}}
+</script>
 </head>
 <body>
 <div id="app"><canvas id="scene"></canvas></div>
@@ -17,8 +20,8 @@
   <div class="hint">鼠标：左键旋转 · 滚轮缩放 · 点击锁定</div>
 </div>
 <script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js';
-import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/controls/OrbitControls.js';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const canvas=document.getElementById('scene');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
