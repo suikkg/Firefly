@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#06101c" />
+<title>3D 健身肌群模型</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#06101c;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:#eaf8ff}body{background:radial-gradient(circle at 20% 15%,#08395b 0,transparent 32%),radial-gradient(circle at 80% 35%,#073a32 0,transparent 28%),linear-gradient(180deg,#081421,#040911)}#app,canvas{width:100%;height:100%;display:block}.hud{position:fixed;inset:0;pointer-events:none}.title{position:absolute;top:max(12px,env(safe-area-inset-top));left:12px;padding:10px 13px;border:1px solid #5edfff33;border-radius:14px;background:#071524a8;backdrop-filter:blur(12px);box-shadow:0 0 25px #00bfff16}.title b{font-size:16px;letter-spacing:.5px}.title span{display:block;margin-top:5px;font-size:11px;color:#b6d9e8aa}.panel{position:absolute;right:12px;top:max(12px,env(safe-area-inset-top));width:min(350px,42vw);padding:16px;border:1px solid #5edfff38;border-radius:18px;background:#071524c4;backdrop-filter:blur(14px);box-shadow:0 0 30px #00bfff16}.tag{font-size:10px;letter-spacing:1.4px;color:#71dbff}.name{margin-top:9px;font-size:clamp(25px,4vw,42px);font-weight:760;text-shadow:0 0 18px #4fdcff55}.sub{margin-top:5px;font-size:13px;color:#b9e6f6}.desc{margin-top:12px;padding-top:11px;border-top:1px solid #73ddff24;font-size:12px;line-height:1.55;color:#cde8f3bb}.hint{position:absolute;left:12px;bottom:max(12px,env(safe-area-inset-bottom));font-size:11px;color:#bfdfecaa;padding:9px 11px;border-radius:12px;border:1px solid #6fdcff22;background:#07152496;backdrop-filter:blur(10px)}@media(max-width:780px){.panel{left:12px;right:12px;top:auto;bottom:max(12px,env(safe-area-inset-bottom));width:auto;padding:13px}.name{font-size:28px}.desc{font-size:11px;margin-top:8px;padding-top:8px}.hint{display:none}.title span{max-width:220px}.title{padding:9px 11px}}
+</style>
+</head>
+<body>
+<div id="app"><canvas id="scene"></canvas></div>
+<div class="hud">
+  <div class="title"><b>3D 健身肌群模型</b><span>单指旋转 · 双指缩放/平移 · 点击肌群锁定</span></div>
+  <div class="panel"><div class="tag">MUSCLE SCAN</div><div class="name" id="name">胸大肌</div><div class="sub" id="sub">前侧胸部</div><div class="desc" id="desc">点击或悬停模型上的肌群查看名称与功能。</div></div>
+  <div class="hint">鼠标：左键旋转 · 滚轮缩放 · 点击锁定</div>
+</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/controls/OrbitControls.js';
+
+const canvas=document.getElementById('scene');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;
+const scene=new THREE.Scene();scene.fog=new THREE.Fog(0x06101c,9,24);
+const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,100);camera.position.set(0,2.1,8.4);
+const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=.07;controls.minDistance=4.2;controls.maxDistance=14;controls.target.set(0,.2,0);controls.enablePan=true;
+scene.add(new THREE.HemisphereLight(0xa6e8ff,0x102030,2.1));
+const key=new THREE.DirectionalLight(0x8edfff,2.8);key.position.set(4,7,6);scene.add(key);
+const rim=new THREE.DirectionalLight(0x577cff,1.7);rim.position.set(-5,4,-5);scene.add(rim);
+const ground=new THREE.GridHelper(14,28,0x1b91c0,0x12354a);ground.position.y=-3.05;ground.material.transparent=true;ground.material.opacity=.26;scene.add(ground);
+const ring=new THREE.Mesh(new THREE.TorusGeometry(2.55,.018,10,100),new THREE.MeshBasicMaterial({color:0x4ee7ff,transparent:true,opacity:.32}));ring.rotation.x=Math.PI/2;ring.position.y=-3.02;scene.add(ring);
+
+const body=new THREE.Group();scene.add(body);const hit=[];let hovered=null,selected=null;
+const coreMat=()=>new THREE.MeshPhysicalMaterial({color:0x173653,emissive:0x0e3457,emissiveIntensity:.18,roughness:.55,metalness:.12});
+const muscleMat=(c)=>new THREE.MeshPhysicalMaterial({color:c,emissive:0x1578b5,emissiveIntensity:.34,roughness:.35,metalness:.14,clearcoat:.35});
+function core(g,p,r){const m=new THREE.Mesh(g,coreMat());m.position.set(...p);if(r)m.rotation.set(...r);body.add(m);return m}
+function part(g,c,p,r,label,sub,desc){const m=new THREE.Mesh(g,muscleMat(c));m.position.set(...p);if(r)m.rotation.set(...r);m.userData={label,sub,desc,base:.34};hit.push(m);body.add(m);return m}
+function capsule(rad,len){return new THREE.CapsuleGeometry(rad,len,8,18)}
+function sphere(rad){return new THREE.SphereGeometry(rad,22,22)}
+function box(x,y,z){return new THREE.BoxGeometry(x,y,z)}
+
+core(capsule(.78,1.75),[0,.95,0]);core(box(1.35,.72,.82),[0,-.42,0]);core(sphere(.43),[0,2.83,0]);core(new THREE.CylinderGeometry(.16,.19,.32,16),[0,2.32,0]);
+part(box(.68,.54,.38),0x4fa8ff,[-.39,1.45,.43],[.08,.04,-.17],'胸大肌','前侧胸部','肩关节水平内收、屈曲和内旋；卧推、俯卧撑、夹胸主要参与。');
+part(box(.68,.54,.38),0x4fa8ff,[.39,1.45,.43],[.08,-.04,.17],'胸大肌','前侧胸部','肩关节水平内收、屈曲和内旋；卧推、俯卧撑、夹胸主要参与。');
+part(box(.72,.92,.2),0x48d8ff,[0,.58,.5],null,'腹直肌','前侧核心','躯干屈曲和核心稳定；卷腹、举腿、平板支撑主要参与。');
+part(box(.66,1.02,.34),0x536fff,[-.56,1.02,-.4],[.06,-.08,.18],'背阔肌','背部外侧','肩关节内收、伸展和内旋；引体向上、下拉、划船主要参与。');
+part(box(.66,1.02,.34),0x536fff,[.56,1.02,-.4],[.06,.08,-.18],'背阔肌','背部外侧','肩关节内收、伸展和内旋；引体向上、下拉、划船主要参与。');
+part(sphere(.32),0x746cff,[-1.03,1.53,.02],null,'三角肌','肩部','前束、中束、后束分别参与肩屈曲、外展和水平外展。');
+part(sphere(.32),0x746cff,[1.03,1.53,.02],null,'三角肌','肩部','前束、中束、后束分别参与肩屈曲、外展和水平外展。');
+core(capsule(.17,.76),[-1.22,.78,0],[0,0,.08]);core(capsule(.17,.76),[1.22,.78,0],[0,0,-.08]);
+part(capsule(.15,.65),0xff7968,[-1.08,.79,.25],[0,0,.1],'肱二头肌','大臂前侧','主要负责屈肘和前臂旋后；弯举和部分拉类动作主要参与。');
+part(capsule(.15,.65),0xff7968,[1.08,.79,.25],[0,0,-.1],'肱二头肌','大臂前侧','主要负责屈肘和前臂旋后；弯举和部分拉类动作主要参与。');
+part(capsule(.145,.68),0x62bfff,[-1.18,.77,-.23],[0,0,.1],'肱三头肌','大臂后侧','主要负责伸肘；臂屈伸、下压、窄距推类动作主要参与。');
+part(capsule(.145,.68),0x62bfff,[1.18,.77,-.23],[0,0,-.1],'肱三头肌','大臂后侧','主要负责伸肘；臂屈伸、下压、窄距推类动作主要参与。');
+part(capsule(.13,.67),0x63dcff,[-1.3,-.1,.1],[0,0,.05],'前臂肌群','前臂','参与屈腕、伸腕、旋前旋后和握力控制。');
+part(capsule(.13,.67),0x63dcff,[1.3,-.1,.1],[0,0,-.05],'前臂肌群','前臂','参与屈腕、伸腕、旋前旋后和握力控制。');
+core(sphere(.13),[-1.34,-.62,.1]);core(sphere(.13),[1.34,-.62,.1]);
+core(capsule(.23,1.05),[-.39,-1.25,0]);core(capsule(.23,1.05),[.39,-1.25,0]);
+part(capsule(.215,.92),0xff925f,[-.39,-1.25,.25],null,'股四头肌','大腿前侧','主要负责伸膝；深蹲、腿举、箭步蹲等动作主要参与。');
+part(capsule(.215,.92),0xff925f,[.39,-1.25,.25],null,'股四头肌','大腿前侧','主要负责伸膝；深蹲、腿举、箭步蹲等动作主要参与。');
+part(capsule(.19,.88),0x637dff,[-.39,-1.25,-.24],null,'腘绳肌','大腿后侧','主要负责屈膝和髋伸展；罗马尼亚硬拉、腿弯举等动作主要参与。');
+part(capsule(.19,.88),0x637dff,[.39,-1.25,-.24],null,'腘绳肌','大腿后侧','主要负责屈膝和髋伸展；罗马尼亚硬拉、腿弯举等动作主要参与。');
+core(capsule(.17,.9),[-.39,-2.47,0]);core(capsule(.17,.9),[.39,-2.47,0]);
+part(capsule(.16,.72),0x52c9ff,[-.39,-2.42,-.21],null,'小腿三头肌','小腿后侧','腓肠肌和比目鱼肌共同完成踝跖屈；提踵、跑跳主要参与。');
+part(capsule(.16,.72),0x52c9ff,[.39,-2.42,-.21],null,'小腿三头肌','小腿后侧','腓肠肌和比目鱼肌共同完成踝跖屈；提踵、跑跳主要参与。');
+core(box(.34,.12,.7),[-.39,-3.12,.17]);core(box(.34,.12,.7),[.39,-3.12,.17]);
+
+const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();const nameEl=document.getElementById('name'),subEl=document.getElementById('sub'),descEl=document.getElementById('desc');
+function info(m){nameEl.textContent=m.userData.label;subEl.textContent=m.userData.sub;descEl.textContent=m.userData.desc}
+function reset(m){if(!m)return;m.material.emissive.setHex(0x1578b5);m.material.emissiveIntensity=m.userData.base;m.scale.setScalar(1)}
+function glow(m,strong=false){m.material.emissive.setHex(0x66eaff);m.material.emissiveIntensity=strong?1.25:.8;m.scale.setScalar(strong?1.055:1.03)}
+function pointer(e){const r=canvas.getBoundingClientRect();mouse.x=(e.clientX-r.left)/r.width*2-1;mouse.y=-(e.clientY-r.top)/r.height*2+1}
+canvas.addEventListener('pointermove',e=>{pointer(e);if(selected)return;ray.setFromCamera(mouse,camera);const m=ray.intersectObjects(hit,false)[0]?.object||null;if(hovered!==m){reset(hovered);hovered=m;if(m){glow(m);info(m)}}});
+canvas.addEventListener('click',e=>{pointer(e);ray.setFromCamera(mouse,camera);const m=ray.intersectObjects(hit,false)[0]?.object||null;if(m){reset(selected);reset(hovered);selected=m;hovered=m;glow(m,true);info(m)}else{reset(selected);selected=null}});
+const pts=new Float32Array(900);for(let i=0;i<pts.length;i++)pts[i]=(Math.random()-.5)*(i%3===1?10:18);const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pts,3));const particles=new THREE.Points(pg,new THREE.PointsMaterial({color:0x57dfff,size:.028,transparent:true,opacity:.45}));scene.add(particles);
+function animate(t){requestAnimationFrame(animate);controls.update();particles.rotation.y=t*.000025;ring.rotation.z=t*.00018;if(selected)glow(selected,true);renderer.render(scene,camera)}requestAnimationFrame(animate);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2))});
+</script>
+</body>
+</html>
