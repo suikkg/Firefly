@@ -4,7 +4,7 @@ published: 2026-08-04
 description: 分析 5G 终端在 T300 超时、服务小区被 Bar 后，因 MAC 下发 PHY Reset 消息延迟，导致物理层跳过快速重选、反复在被 Bar 小区建链失败的完整机制链路。
 image: ''
 tags: [5G, NR, 协议栈, RRC, 问题分析]
-category: 技术分析
+category: 故障分析
 draft: false
 lang: zh-CN
 slug: t300-fast-reselection-mac-reset

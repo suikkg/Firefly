@@ -5,11 +5,11 @@ import Comment from "@/components/comment/index.astro";
 import { commentConfig, siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import LabPage from "@/layouts/LabPage.astro";
-import "@/styles/lab-prose.css";
+import SitePage from "@/layouts/SitePage.astro";
+import "@/styles/site-prose.css";
 
 if (!siteConfig.pages.guestbook) {
-	return Astro.redirect("/404/");
+	return Astro.redirect("/404.html");
 }
 
 const guestbookPost = await getEntry("spec", "guestbook");
@@ -24,8 +24,8 @@ const title = i18n(I18nKey.guestbook);
 const description = i18n(I18nKey.guestbookDescription);
 ---
 
-<LabPage title={title} description={description} lede={description}>
-	<article class="prose lab-prose flush">
+<SitePage title={title} description={description} lede={description}>
+	<article class="prose site-prose flush">
 		<Content />
 	</article>
 
@@ -39,7 +39,7 @@ const description = i18n(I18nKey.guestbookDescription);
 			<p class="notice">评论系统未启用，留言功能暂不可用。</p>
 		)
 	}
-</LabPage>
+</SitePage>
 
 <style>
 	/* 内容区已有左右留白，正文自身不再重复 */

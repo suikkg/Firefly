@@ -1,0 +1,50 @@
+---
+import { Icon } from "astro-icon/components";
+import SitePage from "@/layouts/SitePage.astro";
+import { getSortedPostsList } from "@/utils/content-utils";
+import { postSeries } from "@/utils/post-series";
+import { url } from "@/utils/url-utils";
+
+const posts = await getSortedPostsList();
+const publishedIds = new Set(posts.map((post) => post.id));
+const series = postSeries
+	.map((topic) => ({
+		...topic,
+		count: topic.postIds.filter((id) => publishedIds.has(id)).length,
+	}))
+	.filter((topic) => topic.count > 0);
+---
+
+<SitePage title="专题" description="KK 的文章专题。" lede={`共 ${series.length} 个专题。`}>
+	{
+		series.length > 0 ? (
+			<ul class="series-list">
+				{series.map((topic) => (
+					<li>
+						<a class="series-link" href={url(topic.href)}>
+							<div class="series-title"><h2>{topic.title}</h2><span>{topic.count} 篇文章</span></div>
+							<span class="series-action">查看专题 <Icon is:inline name="lucide:arrow-up-right" /></span>
+						</a>
+					</li>
+				))}
+			</ul>
+		) : (
+			<div class="series-empty"><p>还没有整理好的专题。</p><a href={url("/archive/")}>浏览全部文章</a></div>
+		)
+	}
+</SitePage>
+
+<style>
+	.series-list { max-width: 780px; list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--hair); }
+	.series-list li { border-bottom: 1px solid var(--hair); }
+	.series-link { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 116px; padding: 24px 0; color: var(--ink); text-decoration: none; }
+	.series-title { min-width: 0; }
+	.series-title h2 { margin: 0 0 8px; font-size: 22px; line-height: 1.5; font-weight: 650; letter-spacing: -0.02em; }
+	.series-title > span { color: var(--ink-soft); font-size: 13px; }
+	.series-action { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; color: var(--accent); white-space: nowrap; }
+	.series-action svg { width: 17px; height: 17px; }
+	.series-link:hover h2 { color: var(--accent); }
+	.series-empty p { margin: 0 0 16px; color: var(--ink-soft); font-size: 15px; }
+	.series-empty a { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; }
+	@media (max-width: 600px) { .series-link { align-items: flex-start; flex-direction: column; gap: 8px; } .series-title h2 { font-size: 20px; } }
+</style>

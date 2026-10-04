@@ -1,491 +1,101 @@
 ---
 import { render } from "astro:content";
-// ─────────────────────────────────────────────────────────────────────────
-// 先锋方向概念稿 · 文章页
-// 正文排版是这套语言最吃功力的地方：字号阶梯、行长、行距、留白节奏，
-// 以及标题/引用/代码/图片之间的层级关系，全部在这里重新定义。
-// ─────────────────────────────────────────────────────────────────────────
 import type { GetStaticPaths } from "astro";
-import { Icon } from "astro-icon/components";
 import Comment from "@/components/comment/index.astro";
+import CodeGroupManager from "@/components/features/CodeGroupManager.astro";
 import EncryptedPost from "@/components/features/EncryptedPost.astro";
 import FancyboxManager from "@/components/features/FancyboxManager.astro";
 import KatexManager from "@/components/features/KatexManager.astro";
-import LabHead from "@/components/lab/LabHead.astro";
-import { siteConfig } from "@/config";
-import { getSortedPosts } from "@/utils/content-utils";
-// 提醒框（callouts）样式由插件主题提供，概念稿不引全局表，得自己带一份
+import ReadingTools from "@/components/site/ReadingTools.astro";
+import SiteFooter from "@/components/site/SiteFooter.astro";
+import SiteHead from "@/components/site/SiteHead.astro";
+import SiteHeader from "@/components/site/SiteHeader.astro";
+import { licenseConfig, profileConfig, siteConfig } from "@/config";
+import { getRelatedPosts, getSortedPosts } from "@/utils/content-utils";
+import { phyDictionarySeries } from "@/utils/post-series";
+import { usableImage } from "@/utils/site-utils";
 import "@rehype-callouts-theme";
-import "@/styles/lab.css";
-import "@/styles/lab-prose.css";
-
+import "@/styles/site.css";
+import "@/styles/site-prose.css";
+import "@/styles/diagrams.css";
+import "@/styles/expressive-code.css";
 export const getStaticPaths = (async () => {
-	const posts = await getSortedPosts();
-	return posts.map((entry, index) => ({
-		params: { slug: entry.id },
-		props: {
-			entry,
-			prev: posts[index + 1] ?? null,
-			next: posts[index - 1] ?? null,
-		},
-	}));
+	const posts = (await getSortedPosts()).sort(
+		(a, b) => b.data.published.getTime() - a.data.published.getTime(),
+	);
+	return posts.map((entry, index) => {
+		const seriesIndex = phyDictionarySeries.indexOf(entry.id);
+		const prev =
+			seriesIndex >= 0
+				? posts.find((post) => post.id === phyDictionarySeries[seriesIndex - 1])
+				: posts[index + 1];
+		const next =
+			seriesIndex >= 0
+				? posts.find((post) => post.id === phyDictionarySeries[seriesIndex + 1])
+				: posts[index - 1];
+		return {
+			params: { slug: entry.id },
+			props: { entry, prev: prev ?? null, next: next ?? null },
+		};
+	});
 }) satisfies GetStaticPaths;
-
 const { entry, prev, next } = Astro.props;
 const { Content, headings, remarkPluginFrontmatter } = await render(entry);
-
-const words: number = remarkPluginFrontmatter?.words ?? 0;
 const minutes: number = remarkPluginFrontmatter?.minutes ?? 0;
-
-const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
-	year: "numeric",
-	month: "2-digit",
-	day: "2-digit",
-});
-
-// 只取 h2/h3 进目录：h4 以下放进来会让侧栏变成第二篇文章。
-// autolink-headings 会把锚点的 "#" 并进 heading.text，这里去掉。
+const isEncrypted = !!entry.data.password;
 const tocItems = headings
 	.filter((h) => h.depth === 2 || h.depth === 3)
 	.map((h) => ({ ...h, text: h.text.replace(/#+\s*$/, "").trim() }));
-
-function usableImage(src: string): string {
-	if (!src) return "";
-	if (src.startsWith("http://") || src.startsWith("https://")) return src;
-	if (src.startsWith("/")) return src;
-	return "";
-}
+const related = await getRelatedPosts(entry, 3);
 const cover = usableImage(entry.data.image);
-
-// 带密码的文章必须走构建期加密：直接渲染 <Content /> 会把正文明文写进 HTML
-const isEncrypted = !!entry.data.password;
 ---
-
-<html lang="zh-CN">
-	<head>
-		<LabHead
-			title={entry.data.title}
-			description={entry.data.description || siteConfig.description}
-			postSlug={entry.id}
-			ogType="article"
-		/>
-		<KatexManager />
-	</head>
-
-	<body>
-		<!-- 阅读进度：一条 1px 的线，不抢视线 -->
-		<div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
-
-		<header class="topbar">
-			<a href="/" class="circle-btn" aria-label="返回索引">
-				<Icon is:inline name="lucide:arrow-left" />
-			</a>
-			<span class="topbar-title micro" id="topbar-title">{entry.data.title}</span>
-			<button id="theme-toggle" class="circle-btn" type="button" aria-label="切换明暗">
-				<Icon is:inline name="lucide:sun-moon" />
-			</button>
-		</header>
-
-		<!-- 标题区：占满一屏宽度，元信息用等宽小字压在底部 -->
-		<section class="masthead">
-			<p class="kicker micro">
-				<span>{entry.data.category || "未分类"}</span>
-				<span class="kicker-sep">/</span>
-				<span>{dateFormatter.format(entry.data.published)}</span>
-			</p>
-
-			<h1 class="title">{entry.data.title}</h1>
-
-			{entry.data.description && <p class="standfirst">{entry.data.description}</p>}
-
-			<div class="masthead-meta">
-				<div class="meta-cell">
-					<span class="micro">字数</span>
-					<span class="meta-val">{words.toLocaleString("en-US")}</span>
-				</div>
-				<div class="meta-cell">
-					<span class="micro">阅读</span>
-					<span class="meta-val">{minutes} 分钟</span>
-				</div>
-				<div class="meta-cell">
-					<span class="micro" id="meta-toc-label">{isEncrypted ? "状态" : "章节"}</span>
-					<span class="meta-val" id="meta-toc-value">
-						{isEncrypted ? "已加密" : String(tocItems.length).padStart(2, "0")}
-					</span>
-				</div>
-				{
-					entry.data.tags.length > 0 && (
-						<div class="meta-cell meta-tags">
-							<span class="micro">标签</span>
-							<span class="meta-val">{entry.data.tags.join(" · ")}</span>
-						</div>
-					)
-				}
-			</div>
-		</section>
-
-		{
-			cover && (
-				<figure class="cover">
-					<img src={cover} alt={entry.data.title} loading="eager" decoding="async" />
-				</figure>
-			)
-		}
-
-		<!-- 目录轨：默认只是一列短横线，靠近才展开文字 -->
-		<!-- 加密文章不能在 SSR 里输出标题（标题本身也是正文），先留空壳，解锁后从正文重建 -->
-		{
-			isEncrypted ? (
-				<nav class="toc" id="toc" aria-label="目录" hidden>
-					<ul />
-				</nav>
-			) : (
-				tocItems.length > 1 && (
-					<nav class="toc" id="toc" aria-label="目录">
-						<ul>
-							{tocItems.map((h) => (
-								<li class={`toc-item depth-${h.depth}`}>
-									<a href={`#${h.slug}`} data-toc-link={h.slug}>
-										<span class="toc-line" />
-										<span class="toc-text">{h.text}</span>
-									</a>
-								</li>
-							))}
-						</ul>
-					</nav>
-				)
-			)
-		}
-
-		<article class="prose lab-prose" id="article">
-			{
-				isEncrypted ? (
-					<EncryptedPost
-						password={entry.data.password}
-						slug={entry.id}
-						hint={entry.data.passwordHint}
-					>
-						<Content />
-					</EncryptedPost>
-				) : (
-					<Content />
-				)
-			}
+<html lang={entry.data.lang || siteConfig.lang.replace("_", "-")}>
+<head><SiteHead title={entry.data.title} description={entry.data.description || siteConfig.description} postSlug={entry.id} ogType="article" /><KatexManager /></head>
+<body><div class="site-shell"><SiteHeader />
+<div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
+<main class="site-main reading-main" id="main-content" data-pagefind-body>
+	<header class="article-heading">
+		<div class="note-meta"><a href={`/archive/?category=${encodeURIComponent(entry.data.category || "未分类")}`}>{entry.data.category || "未分类"}</a><time datetime={entry.data.published.toISOString()}>{entry.data.published.toISOString().slice(0, 10)}</time>{entry.data.updated && <span>更新 {entry.data.updated.toISOString().slice(0, 10)}</span>}</div>
+		<h1 data-pagefind-meta="title">{entry.data.title}</h1>
+		{entry.data.description && <p class="standfirst" data-pagefind-meta="description">{entry.data.description}</p>}
+		<div class="note-meta" data-pagefind-ignore>{isEncrypted ? <span class="lock-label">受保护笔记</span> : <span>约 {minutes} 分钟阅读</span>}{entry.data.tags.map(tag => <a href={`/archive/?tag=${encodeURIComponent(tag)}`}>{tag}</a>)}</div>
+		{cover && <img class="post-cover" src={cover} alt="" width="780" height="440" decoding="async" />}
+		<ReadingTools post={{ id: entry.id, title: entry.data.title }} protected={isEncrypted} />
+	</header>
+	<div class="reading-grid">
+		<article class="prose site-prose" id="article" tabindex="-1" data-pagefind-ignore={isEncrypted ? "all" : undefined}>
+			{isEncrypted ? <EncryptedPost password={entry.data.password} slug={entry.id} hint={entry.data.passwordHint}><Content /></EncryptedPost> : <Content />}
 		</article>
-
-		{
-			entry.data.comment && !isEncrypted && (
-				<section class="comments">
-					<h2 class="comments-title micro">评论</h2>
-					<Comment post={entry} />
-				</section>
-			)
-		}
-
-		<!-- 图片灯箱：脚本与样式都是按需加载，没有可放大的图片时不会触发 -->
-		<FancyboxManager />
-
-		<footer class="footer">
-			<div class="pager">
-				{
-					prev ? (
-						<a class="pager-link prev" href={`/posts/${prev.id}/`}>
-							<span class="micro">
-								<Icon is:inline name="lucide:arrow-left" /> 上一篇
-							</span>
-							<span class="pager-title">{prev.data.title}</span>
-						</a>
-					) : (
-						<span />
-					)
-				}
-				{
-					next && (
-						<a class="pager-link next" href={`/posts/${next.id}/`}>
-							<span class="micro">
-								下一篇 <Icon is:inline name="lucide:arrow-right" />
-							</span>
-							<span class="pager-title">{next.data.title}</span>
-						</a>
-					)
-				}
-			</div>
-
-			<div class="footer-meta micro">
-				<a href="/" class="back">
-					<Icon is:inline name="lucide:arrow-left" />
-					<span>全部文章</span>
-				</a>
-				<a href={`/classic/posts/${entry.id}/`} class="back">
-					<span>在旧版界面中查看</span>
-					<Icon is:inline name="lucide:layout-panel-left" />
-				</a>
-			</div>
-		</footer>
-
-		<style>
-			/* ── 进度 / 顶栏 ─────────────────────────────────────── */
-			.progress {
-				position: fixed;
-				inset: 0 0 auto;
-				height: 1px;
-				z-index: 90;
-				background: var(--hair);
-			}
-
-			.progress span {
-				display: block;
-				height: 100%;
-				width: 0;
-				background: var(--accent);
-				transform-origin: left;
-			}
-
-			.topbar {
-				position: fixed;
-				top: 0;
-				left: 0;
-				right: 0;
-				z-index: 80;
-				display: grid;
-				grid-template-columns: 2.4rem 1fr 2.4rem;
-				align-items: center;
-				gap: 1rem;
-				padding: 1.1rem var(--gutter);
-				/* 只在滚动后才铺底色，首屏保持通透 */
-				background: transparent;
-				transition: background-color 0.4s var(--ease-out);
-			}
-
-			.topbar.is-stuck {
-				background: color-mix(in oklch, var(--ground) 86%, transparent);
-				backdrop-filter: blur(14px);
-			}
-
-			.topbar-title {
-				text-align: center;
-				overflow: hidden;
-				text-overflow: ellipsis;
-				white-space: nowrap;
-				opacity: 0;
-				transition: opacity 0.4s var(--ease-out);
-			}
-
-			.topbar.is-stuck .topbar-title { opacity: 1; }
-
-			/* ── 标题区 ──────────────────────────────────────────── */
-			.masthead {
-				max-width: var(--page-max);
-				margin-inline: auto;
-				padding: clamp(6rem, 16vh, 11rem) var(--gutter) clamp(2rem, 5vw, 3.5rem);
-			}
-
-			.kicker {
-				display: flex;
-				align-items: center;
-				gap: 0.7rem;
-				margin: 0 0 clamp(1.2rem, 3vw, 2rem);
-			}
-
-			.kicker-sep { color: var(--accent); }
-
-			/* 大标题：字距随字号收紧，行距压到 0.98 让多行标题成块 */
-			.title {
-				margin: 0;
-				max-width: 18ch;
-				font-size: clamp(2.4rem, 6.4vw, 6rem);
-				font-weight: 800;
-				line-height: 0.98;
-				letter-spacing: -0.038em;
-				text-wrap: balance;
-				animation: fade-up 0.9s var(--ease-out) backwards;
-			}
-
-			/* 导语比正文大一档，作为标题与正文之间的过渡台阶 */
-			.standfirst {
-				max-width: 46ch;
-				margin: clamp(1.5rem, 3.5vw, 2.4rem) 0 0;
-				font-size: clamp(1.05rem, 1.5vw, 1.3rem);
-				line-height: 1.62;
-				color: var(--ink-soft);
-				text-wrap: pretty;
-				animation: fade-up 0.9s var(--ease-out) 0.1s backwards;
-			}
-
-			.masthead-meta {
-				display: flex;
-				flex-wrap: wrap;
-				gap: clamp(1.5rem, 4vw, 3.5rem);
-				margin-top: clamp(2rem, 5vw, 3.5rem);
-				padding-top: 1.2rem;
-				border-top: 1px solid var(--hair);
-				animation: fade-up 0.9s var(--ease-out) 0.2s backwards;
-			}
-
-			.meta-cell {
-				display: flex;
-				flex-direction: column;
-				gap: 0.4rem;
-			}
-
-			.meta-val {
-				font-size: 0.95rem;
-				font-variant-numeric: tabular-nums;
-			}
-
-			.meta-tags { max-width: 30ch; }
-
-			/* ── 封面 ────────────────────────────────────────────── */
-			.cover {
-				max-width: var(--page-max);
-				margin: 0 auto clamp(3rem, 8vw, 6rem);
-				padding: 0 var(--gutter);
-			}
-
-			.cover img {
-				display: block;
-				width: 100%;
-				max-height: 74vh;
-				object-fit: cover;
-				border-radius: 2px;
-			}
-
-			/* ── 目录轨 ──────────────────────────────────────────── */
-			.toc {
-				position: fixed;
-				top: 50%;
-				right: 1.6rem;
-				z-index: 50;
-				transform: translateY(-50%);
-				max-height: 70vh;
-				overflow: hidden;
-			}
-
-			.toc ul {
-				display: flex;
-				flex-direction: column;
-				align-items: flex-end;
-				gap: 0.55rem;
-				margin: 0;
-				padding: 0;
-				list-style: none;
-			}
-
-			.toc a {
-				display: flex;
-				align-items: center;
-				justify-content: flex-end;
-				gap: 0.6rem;
-				text-decoration: none;
-				color: var(--ink-soft);
-			}
-
-			/* 平时只是一列长短不一的横线，构成一张缩略的文章地形图 */
-			.toc-line {
-				display: block;
-				width: 1.4rem;
-				height: 1px;
-				background: var(--ink-mute);
-				transition:
-					width 0.45s var(--spring),
-					background-color 0.35s var(--ease-out);
-			}
-
-			.toc-item.depth-3 .toc-line { width: 0.8rem; }
-
-			.toc-text {
-				max-width: 0;
-				overflow: hidden;
-				white-space: nowrap;
-				font-size: 0.72rem;
-				opacity: 0;
-				transition:
-					max-width 0.5s var(--ease-out),
-					opacity 0.35s var(--ease-out);
-			}
-
-			.toc-item.is-active .toc-line {
-				width: 2.4rem;
-				background: var(--accent);
-			}
-
-			.toc:hover .toc-text,
-			.toc-item.is-active .toc-text {
-				max-width: 14rem;
-				opacity: 1;
-			}
-
-			.toc-item.is-active a { color: var(--ink); }
-
-			/* 加密文章解锁前是空壳，position:fixed 会盖掉 [hidden] 的 display:none */
-			.toc[hidden] { display: none; }
-
-			@media (max-width: 1280px) {
-				.toc { display: none; }
-			}
-
-			/* ── 页脚 ────────────────────────────────────────────── */
-			.footer {
-				padding: clamp(2rem, 6vw, 4rem) var(--gutter) 2rem;
-				border-top: 1px solid var(--hair);
-			}
-
-			.pager {
-				display: grid;
-				grid-template-columns: 1fr 1fr;
-				gap: clamp(1.5rem, 5vw, 4rem);
-				margin-bottom: clamp(2.5rem, 6vw, 4rem);
-			}
-
-			.pager-link {
-				display: flex;
-				flex-direction: column;
-				gap: 0.8rem;
-				color: inherit;
-				text-decoration: none;
-			}
-
-			.pager-link.next { text-align: right; }
-
-			.pager-title {
-				font-size: clamp(1.1rem, 2.2vw, 1.75rem);
-				font-weight: 650;
-				line-height: 1.2;
-				letter-spacing: -0.02em;
-				text-wrap: balance;
-				transition: color 0.3s var(--ease-out);
-			}
-
-			.pager-link:hover .pager-title { color: var(--accent); }
-
-			.footer-meta {
-				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				gap: 1rem;
-			}
-
-			.back {
-				display: inline-flex;
-				align-items: center;
-				gap: 0.6rem;
-				color: inherit;
-				text-decoration: none;
-				transition: color 0.3s var(--ease-out);
-			}
-
-			.back:hover { color: var(--accent); }
-
-			@media (max-width: 640px) {
-				.pager { grid-template-columns: 1fr; }
-				.pager-link.next { text-align: left; }
-			}
-		</style>
-
+		<details class="toc" id="toc" aria-label="文章目录" open hidden={isEncrypted || tocItems.length === 0} data-pagefind-ignore>
+			<summary>文章目录</summary><ul>{!isEncrypted && tocItems.map(h => <li class={`toc-item depth-${h.depth}`}><a href={`#${h.slug}`} data-toc-link={h.slug}><span class="toc-text">{h.text}</span></a></li>)}</ul>
+		</details>
+	</div>
+	<section class="article-end" data-pagefind-ignore>
+		<nav class="reading-pager" aria-label={phyDictionarySeries.includes(entry.id) ? "字典系列前后篇" : "前后篇"}>{prev && <a href={`/posts/${prev.id}/`}><span>上一篇</span>{prev.data.title}</a>}{next && <a href={`/posts/${next.id}/`}><span>下一篇</span>{next.data.title}</a>}</nav>
+		{licenseConfig.enable && <p class="license">作者：{entry.data.author || profileConfig.name} · <a href={entry.data.licenseUrl || licenseConfig.url}>{entry.data.licenseName || licenseConfig.name}</a>{entry.data.sourceLink && <> · <a href={entry.data.sourceLink}>原文来源</a></>}</p>}
+		{related.length > 0 && <section class="related"><h2>继续阅读</h2><ul>{related.map(post => <li><a href={`/posts/${post.id}/`}>{post.data.title}</a></li>)}</ul></section>}
+		{entry.data.comment && !isEncrypted && <Comment post={entry} />}
+	</section>
+</main><FancyboxManager /><CodeGroupManager /><SiteFooter /></div>
+<style>
+.progress { position: fixed; inset: 0 0 auto; height: 2px; z-index: 100; }.progress span { display: block; height: 100%; width: 0; background: var(--accent); }
+.reading-main { max-width: var(--page-max); }
+.article-heading { max-width: 780px; margin-bottom: 32px; }
+.article-heading h1 { font-size: clamp(28px, 3.6vw, 42px); line-height: 1.4; letter-spacing: -0.025em; margin: 16px 0; }
+.standfirst { font-size: 16px; line-height: 1.8; color: var(--ink-soft); margin-bottom: 20px; }
+.post-cover { display: block; width: 100%; height: auto; max-height: 420px; object-fit: cover; margin-top: 24px; border-radius: 12px; }
+.reading-grid { display: grid; grid-template-columns: minmax(0, 780px) minmax(0, 220px); gap: 48px; align-items: start; }
+.toc { position: sticky; top: 24px; max-height: calc(100svh - 48px); overflow-y: auto; font-size: 13px; border-left: 1px solid var(--hair); padding-left: 16px; }
+.toc summary { font-weight: 650; cursor: pointer; color: var(--ink); padding-block: 8px; }
+.toc ul { list-style: none; padding: 0; margin: 8px 0; }.toc li { margin: 4px 0; }.toc a { color: var(--ink-soft); text-decoration: none; display: block; padding: 6px 0; line-height: 1.6; }.toc .depth-3 { padding-left: 12px; }.toc .is-active a { color: var(--accent); font-weight: 650; }
+.article-end { max-width: 780px; margin-top: 40px; }.reading-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; border-top: 1px solid var(--hair); padding-block: 24px; }.reading-pager a { line-height: 1.7; text-decoration: none; }.reading-pager span { display: block; color: var(--ink-soft); font-size: 13px; margin-bottom: 8px; }
+.license { font-size: 13px; color: var(--ink-soft); line-height: 1.8; }.related { margin-block: 32px; }.related h2 { font-size: 20px; }.related ul { padding-left: 20px; line-height: 2; }
+@media (max-width: 1000px) { .reading-grid { display: flex; flex-direction: column; gap: 24px; }.toc { order: -1; position: static; width: 100%; max-height: 320px; background: var(--card); border: 1px solid var(--hair); border-radius: 8px; padding: 8px 16px; }.article-heading, .article-end { margin-inline: auto; }.reading-main { max-width: 780px; } }
+@media (max-width: 600px) { .reading-pager { grid-template-columns: 1fr; }.standfirst { font-size: 14px; } }
+</style>
 		<script>
-			// ── 阅读进度 + 顶栏贴顶 ───────────────────────────────
+			// 阅读进度只计算正文区间。
 			const bar = document.getElementById("progress-bar");
-			const topbar = document.querySelector<HTMLElement>(".topbar");
 			const article = document.getElementById("article");
 
 			let ticking = false;
@@ -496,8 +106,9 @@ const isEncrypted = !!entry.data.password;
 				requestAnimationFrame(() => {
 					if (bar && article) {
 						// 进度按正文区间算，而不是整页 —— 读完最后一段就该是 100%
-						const start = article.offsetTop;
-						const span = article.offsetHeight - window.innerHeight;
+						const bounds = article.getBoundingClientRect();
+						const start = bounds.top + window.scrollY;
+						const span = bounds.height - window.innerHeight;
 						const ratio =
 							span > 0
 								? (window.scrollY - start) / span
@@ -506,12 +117,13 @@ const isEncrypted = !!entry.data.password;
 									: 0;
 						bar.style.width = `${Math.min(100, Math.max(0, ratio * 100))}%`;
 					}
-					topbar?.classList.toggle("is-stuck", window.scrollY > 120);
 					ticking = false;
 				});
 			}
 
 			window.addEventListener("scroll", onScroll, { passive: true });
+			window.addEventListener("resize", onScroll);
+			if (article && "ResizeObserver" in window) new ResizeObserver(onScroll).observe(article);
 			onScroll();
 
 			// ── 目录高亮 ──────────────────────────────────────────
@@ -562,6 +174,8 @@ const isEncrypted = !!entry.data.password;
 			// ── 加密文章：解锁后从正文重建目录 ────────────────────
 			// 正文是解密时才注入 DOM 的，SSR 阶段没有标题可用，只能在这里补
 			function buildTocFromArticle(): void {
+				const decrypted = document.getElementById("decrypted-content");
+				if (decrypted && decrypted.dataset.decryptionComplete !== "true") return;
 				const nav = document.getElementById("toc");
 				const list = nav?.querySelector("ul");
 				// 解密后的正文单独挂在 #decrypted-content 里；解锁面板留在 DOM 中，不能扫进来
@@ -581,27 +195,18 @@ const isEncrypted = !!entry.data.password;
 					link.href = `#${h.id}`;
 					link.dataset.tocLink = h.id;
 
-					const line = document.createElement("span");
-					line.className = "toc-line";
-
 					const text = document.createElement("span");
 					text.className = "toc-text";
 					// autolink-headings 会把锚点的 "#" 并进标题文本，这里去掉
 					text.textContent = (h.textContent ?? "").replace(/#+\s*$/, "").trim();
 
-					link.append(line, text);
+					link.append(text);
 					item.append(link);
 					list.append(item);
 					count++;
 				}
 
-				if (count > 1) nav.removeAttribute("hidden");
-
-				// 标题区那格从「状态 / 已加密」换回真实章节数
-				const label = document.getElementById("meta-toc-label");
-				const value = document.getElementById("meta-toc-value");
-				if (label) label.textContent = "章节";
-				if (value) value.textContent = String(count).padStart(2, "0");
+				nav.hidden = count === 0;
 
 				wireToc();
 				// 正文高度刚从解锁面板变成整篇文章，进度条得重算
@@ -609,21 +214,11 @@ const isEncrypted = !!entry.data.password;
 			}
 
 			document.addEventListener("password:decrypted", buildTocFromArticle);
+			if (document.getElementById("decrypted-content")?.dataset.decryptionComplete === "true") buildTocFromArticle();
 
-			// ── 明暗切换 ──────────────────────────────────────────
-			document.getElementById("theme-toggle")?.addEventListener("click", () => {
-				const dark = document.documentElement.classList.toggle("dark");
-				// 代码块配色跟着一起切
-				document.documentElement.setAttribute(
-					"data-theme",
-					dark ? "one-dark-pro" : "one-light",
-				);
-				try {
-					localStorage.setItem("theme", dark ? "dark" : "light");
-				} catch (e) {
-					/* 隐私模式下忽略 */
-				}
-			});
-		</script>
-	</body>
-</html>
+		</script><script>
+ const toc = document.getElementById("toc") as HTMLDetailsElement | null;
+ if (toc && matchMedia("(max-width: 1000px)").matches) toc.open = false;
+ document.addEventListener("keydown", event => { if (event.key === "Escape" && toc?.open && matchMedia("(max-width: 1000px)").matches) { toc.open = false; toc.querySelector("summary")?.focus(); } });
+ toc?.addEventListener("click", event => { if ((event.target as HTMLElement).closest("a") && matchMedia("(max-width: 1000px)").matches) toc.open = false; });
+</script></body></html>

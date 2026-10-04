@@ -1,101 +1,16 @@
 ---
-// 音乐：YouTube 歌单嵌入
-import { Icon } from "astro-icon/components";
-import LabPage from "@/layouts/LabPage.astro";
-
-// 歌单 ID 取法：YouTube 打开歌单 → 地址栏 list= 后面的参数
-const YOUTUBE_PLAYLISTS = [
-	{ name: "粤语经典 歌单一", id: "PLDX7UghaEhS3tozBn2fQvxv9emsBO3Fd8" },
-	{ name: "粤语经典 歌单二", id: "PLbdmiTuJcvXqiaN0oQVSXCUsF7DIapKhg" },
+import SitePage from "@/layouts/SitePage.astro";
+const lists = [
+	{ name: "粤语经典 · 歌单一", id: "PLDX7UghaEhS3tozBn2fQvxv9emsBO3Fd8" },
+	{ name: "粤语经典 · 歌单二", id: "PLbdmiTuJcvXqiaN0oQVSXCUsF7DIapKhg" },
 ];
-
-const description = "在线歌单，登录 YouTube 账号后可无广告完整播放。";
 ---
-
-<LabPage title="音乐" description={description} lede={description}>
-	{
-		YOUTUBE_PLAYLISTS.length > 0 ? (
-			<div class="lists">
-				{YOUTUBE_PLAYLISTS.map((pl) => (
-					<section class="list">
-						<h2 class="list-name">
-							<Icon is:inline name="lucide:list-music" />
-							{pl.name}
-						</h2>
-						<div class="frame card">
-							<iframe
-								src={`https://www.youtube.com/embed/videoseries?list=${pl.id}`}
-								title={pl.name}
-								loading="lazy"
-								allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-								allowfullscreen
-							/>
-						</div>
-					</section>
-				))}
-			</div>
-		) : (
-			<p class="empty">
-				<Icon is:inline name="lucide:music" />
-				还没有配置歌单
-			</p>
-		)
-	}
-
-	<div class="notes">
-		<p>
-			<Icon is:inline name="lucide:headphones" />
-			<span>登录你的 YouTube 账号（Premium 会员）后可无广告完整播放；未登录时部分歌曲可能插播广告。</span>
-		</p>
-		<p>
-			<Icon is:inline name="lucide:radio" />
-			<span>侧边栏的音乐播放器播放本地音乐，无需登录、没有广告，歌曲在 <code>src/config/musicConfig.ts</code> 中配置。</span>
-		</p>
-	</div>
-</LabPage>
-
-<style>
-	.lists { display: grid; gap: clamp(1.5rem, 4vw, 2.5rem); }
-
-	.list-name {
-		display: flex; align-items: center; gap: 0.55rem;
-		margin: 0 0 0.85rem;
-		font-size: 1.15rem; font-weight: 650; letter-spacing: -0.015em;
-	}
-	.list-name :global(svg) { color: var(--accent-deep); }
-
-	.frame { overflow: hidden; }
-
-	.frame :global(iframe) {
-		display: block;
-		width: 100%;
-		aspect-ratio: 16 / 9;
-		min-height: 320px;
-		border: 0;
-	}
-
-	.notes {
-		display: grid; gap: 0.85rem;
-		max-width: var(--measure);
-		margin-top: clamp(2rem, 5vw, 3rem);
-		padding-top: 1.5rem;
-		border-top: 1px solid var(--hair);
-	}
-
-	.notes p {
-		display: flex; align-items: flex-start; gap: 0.6rem;
-		margin: 0; font-size: 0.88rem; line-height: 1.7; color: var(--ink-soft);
-	}
-
-	.notes :global(svg) { margin-top: 0.25rem; flex-shrink: 0; color: var(--accent-deep); }
-
-	.notes :global(code) {
-		font-family: var(--mono); font-size: 0.85em;
-		padding: 0.1em 0.35em; border-radius: 3px; background: var(--accent-wash);
-	}
-
-	.empty {
-		display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-		padding: 3.5rem 1rem; color: var(--ink-soft);
-	}
-</style>
+<SitePage title="音乐" lede="一些收藏的歌单。播放器在点击后加载，播放能力取决于平台与当前网络。">
+ <div class="playlists">{lists.map(list => <section class="playlist"><h2>{list.name}</h2><p><a href={`https://www.youtube.com/playlist?list=${list.id}`} target="_blank" rel="noopener noreferrer">在 YouTube 打开</a></p><button type="button" data-playlist={list.id} data-title={list.name}>加载播放器</button><div class="player"></div></section>)}</div>
+</SitePage>
+<script>
+ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-playlist]")) {
+  button.addEventListener("click", () => { const frame = document.createElement("iframe"); frame.src = `https://www.youtube-nocookie.com/embed/videoseries?list=${button.dataset.playlist}`; frame.title = button.dataset.title || "歌单播放器"; frame.allow = "encrypted-media; picture-in-picture"; frame.allowFullscreen = true; button.parentElement?.querySelector(".player")?.append(frame); button.hidden = true; });
+ }
+</script>
+<style>.playlists { display:grid; gap:32px; }.playlist { padding:24px; border:1px solid var(--hair); border-radius:12px; background:var(--card); }.playlist h2 { font-size:22px; margin:0; }.playlist p { font-size:14px; }.playlist button { padding:12px 20px; border:1px solid var(--hair); border-radius:8px; color:var(--ink); background:var(--accent-wash); }.player :global(iframe) { width:100%; aspect-ratio:16 / 9; border:0; display:block; }.player:empty { display:none; }</style>

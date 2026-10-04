@@ -6,7 +6,6 @@ import sitemap from "@astrojs/sitemap";
 import svelte from "@astrojs/svelte";
 import { pluginCollapsibleSections } from "@expressive-code/plugin-collapsible-sections";
 import { pluginLineNumbers } from "@expressive-code/plugin-line-numbers";
-import swup from "@swup/astro";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, fontProviders } from "astro/config";
 import expressiveCode from "astro-expressive-code";
@@ -115,34 +114,6 @@ export default defineConfig({
 	},
 
 	integrations: [
-		swup({
-			theme: false,
-			animationClass: "transition-swup-", // see https://swup.js.org/options/#animationselector
-			// the default value `transition-` cause transition delay
-			// when the Tailwind class `transition-all` is used
-			containers: [
-				"#banner-overlay-container",
-				"#banner-dim-container",
-				"#swup-container",
-				"#left-sidebar-dynamic",
-				"#right-sidebar-dynamic",
-				"#floating-toc-wrapper",
-			],
-			smoothScrolling: false,
-			cache: true,
-			preload: true,
-			accessibility: true,
-			updateHead: true,
-			updateBodyClass: false,
-			globalInstance: true,
-			// 滚动相关配置优化
-			resolveUrl: (url) => url,
-			animateHistoryBrowsing: false,
-			skipPopStateHandling: (event) => {
-				// 跳过锚点链接的处理，让浏览器原生处理
-				return event.state?.url?.includes("#");
-			},
-		}),
 		icon({
 			// 图标统一使用 Lucide；simple-icons 仅保留 Lucide 未收录的品牌标识
 			include: {
@@ -240,7 +211,7 @@ export default defineConfig({
 				const url = new URL(page);
 				const pathname = url.pathname;
 				// 旧版界面是默认版的重复内容，不进 sitemap
-				if (pathname.startsWith("/classic/")) {
+				if (pathname.startsWith("/classic/") || pathname === "/404/" || pathname === "/sponsor/" || pathname.startsWith("/dynamic/comments/")) {
 					return false;
 				}
 				if (pathname === "/dynamic/" && !siteConfig.pages.dynamic) {
@@ -258,7 +229,7 @@ export default defineConfig({
 				if (pathname === "/bangumi/" && !siteConfig.pages.bangumi) {
 					return false;
 				}
-				if (pathname === "/gallery/" && !siteConfig.pages.gallery) {
+				if (pathname.startsWith("/gallery/") && !siteConfig.pages.gallery) {
 					return false;
 				}
 				if (pathname === "/anime/" && !siteConfig.pages.anime) {

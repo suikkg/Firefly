@@ -9,6 +9,9 @@ async function getRawSortedPosts() {
 		return import.meta.env.PROD ? data.draft !== true : true;
 	});
 
+	for (const post of allBlogPosts) {
+		if (post.data.category === "Tools") post.data.category = "自动化工具";
+	}
 	const sorted = allBlogPosts.sort((a, b) => {
 		// 首先按置顶状态排序，置顶文章在前
 		if (a.data.pinned && !b.data.pinned) return -1;

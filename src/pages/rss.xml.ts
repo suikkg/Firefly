@@ -22,7 +22,7 @@ function stripInvalidXmlChars(str: string): string {
 }
 
 export async function GET(context: APIContext): Promise<Response> {
-	const blog = await getSortedPosts();
+	const blog = (await getSortedPosts()).sort((a, b) => b.data.published.getTime() - a.data.published.getTime());
 	const renderers = await loadRenderers([getMDXRenderer()]);
 	const container = await AstroContainer.create({ renderers });
 	const feedItems: RSSFeedItem[] = [];

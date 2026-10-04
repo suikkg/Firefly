@@ -1,0 +1,100 @@
+---
+import {
+	characterScenes,
+	defaultCharacterScene,
+} from "@/config/characterConfig";
+const active = defaultCharacterScene;
+---
+<section class="character-hero" id="home-art" aria-label="我的角色图片" data-scenes={JSON.stringify(characterScenes)}>
+	<div class="art-frame" id="character-frame">
+		<picture id="character-picture">
+			<source id="character-mobile" media="(max-width: 600px)" srcset={active.mobile} />
+			<img id="character-image" src={active.desktop} width="2416" height="1376" alt={`${active.character}：${active.title}`} fetchpriority="high" decoding="async" style={`--desktop-focus:${active.position};--mobile-focus:${active.mobilePosition}`} />
+		</picture>
+		<p id="character-error" class="art-error" role="status" hidden>这张图片暂时无法显示，请换一张。</p>
+	</div>
+	<div class="art-caption">
+		<p id="character-title">{active.character} · {active.title}</p>
+		<div class="art-actions"><a id="character-original" href={active.desktop} target="_blank" rel="noopener">查看原图</a><a href="/gallery/characters/">角色图库</a><button type="button" id="character-toggle" aria-expanded="true" aria-controls="character-frame character-options" disabled>收起图片</button></div>
+	</div>
+	<div class="scene-options" id="character-options" role="group" aria-label="选择首页图片">
+		{characterScenes.map((item, index) => <button type="button" class="scene-choice" data-scene={item.id} aria-label={`选用${item.title}`} aria-pressed={index === 0 ? "true" : "false"} disabled><img src={item.thumbnail} width="240" height="150" alt="" loading="lazy" decoding="async" /><span>{item.title}</span></button>)}
+	</div>
+	<noscript><p class="no-script">通过角色图库查看更多图片。</p></noscript>
+</section>
+<style>
+.character-hero { margin-bottom: 40px; scroll-margin-top: 28px; }
+.art-frame { position: relative; height: clamp(320px, 34vw, 420px); overflow: hidden; border-radius: 16px 16px 4px 4px; background: var(--accent-wash); }
+.art-frame picture { display: block; height: 100%; }.art-frame img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: var(--desktop-focus); }
+.art-caption { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0; }.art-caption p { margin: 0; color: var(--ink-soft); font-size: 12px; }.art-actions { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }.art-actions a,.art-actions button { display: inline-flex; align-items: center; min-height: 44px; font-size: 12px; text-decoration: none; }.art-actions button { background: none; color: var(--ink-soft); border: none; padding: 0; font: inherit; font-size: 12px; cursor: pointer; }.art-actions button:hover { color: var(--accent); }
+.scene-options { display: flex; gap: 12px; overflow-x: auto; padding: 3px 2px 8px; scrollbar-width: thin; }.scene-choice { flex: 0 0 84px; border: 1px solid transparent; background: none; padding: 3px; border-radius: 8px; color: var(--ink-soft); cursor: pointer; font: inherit; font-size: 10px; text-align: center; }.scene-choice img { display: block; width: 76px; height: 47px; object-fit: cover; border-radius: 5px; margin-bottom: 7px; }.scene-choice[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }.scene-choice:hover { background: var(--accent-wash); }.scene-choice:disabled { cursor: default; }.art-error { position: absolute; inset: 0; margin: 0; display: grid; place-items: center; padding: 24px; font-size: 14px; color: var(--ink-soft); text-align: center; }.no-script { font-size: 12px; color: var(--ink-soft); }
+.art-frame[hidden],.scene-options[hidden],.art-error[hidden] { display: none; }
+@media(max-width:600px) { .art-frame { height: 430px; }.art-frame img { object-position: var(--mobile-focus); }.art-caption { flex-direction: column; align-items: flex-start; gap: 0; padding-top: 14px; }.art-actions { justify-content: space-between; width: 100%; gap: 12px; }.character-hero { margin-bottom: 28px; }.scene-choice { flex-basis: 74px; }.scene-choice img { width: 66px; height: 44px; } }
+</style>
+<script>
+	import type { CharacterScene } from "@/config/characterConfig";
+	const root = document.getElementById("home-art");
+	if (root) {
+		const scenes = JSON.parse(root.dataset.scenes || "[]") as CharacterScene[];
+		const image = document.getElementById("character-image") as HTMLImageElement;
+		const mobile = document.getElementById("character-mobile") as HTMLSourceElement;
+		const frame = document.getElementById("character-frame") as HTMLElement;
+		const options = document.getElementById("character-options") as HTMLElement;
+		const title = document.getElementById("character-title") as HTMLElement;
+		const original = document.getElementById("character-original") as HTMLAnchorElement;
+		const toggle = document.getElementById("character-toggle") as HTMLButtonElement;
+		const error = document.getElementById("character-error") as HTMLElement;
+		const choices = [...root.querySelectorAll<HTMLButtonElement>("[data-scene]")];
+		const storageKey = "kk-character-scene-v1";
+		let selected = scenes[0];
+		let hidden = false;
+		const save = () => { try { localStorage.setItem(storageKey, JSON.stringify({ id: selected.id, hidden })); } catch { /* The current page still works when storage is unavailable. */ } };
+		const select = (scene: CharacterScene) => {
+			selected = scene;
+			error.hidden = true;
+			image.style.visibility = "visible";
+			image.style.setProperty("--desktop-focus", scene.position);
+			image.style.setProperty("--mobile-focus", scene.mobilePosition);
+			mobile.srcset = scene.mobile;
+			image.src = scene.desktop;
+			image.alt = `${scene.character}：${scene.title}`;
+			original.href = matchMedia("(max-width: 600px)").matches ? scene.mobile : scene.desktop;
+			title.textContent = `${scene.character} · ${scene.title}`;
+			for (const button of choices) button.setAttribute("aria-pressed", String(button.dataset.scene === scene.id));
+		};
+		const display = () => {
+			frame.hidden = hidden;
+			options.hidden = hidden;
+			original.hidden = hidden;
+			toggle.textContent = hidden ? "显示图片" : "收起图片";
+			toggle.setAttribute("aria-expanded", String(!hidden));
+		};
+		try {
+			const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+			const remembered = scenes.find(scene => scene.id === saved?.id);
+			if (remembered) { selected = remembered; hidden = saved.hidden === true; }
+		} catch { /* Ignore invalid browser preferences. */ }
+		select(selected);
+		display();
+		toggle.disabled = false;
+		for (const button of choices) {
+			button.disabled = false;
+			button.addEventListener("click", () => {
+				const scene = scenes.find(scene => scene.id === button.dataset.scene);
+				if (!scene) return;
+				select(scene);
+				save();
+			});
+		}
+		toggle.addEventListener("click", () => { hidden = !hidden; display(); save(); });
+		const imageFailure = () => {
+			if (selected.id !== scenes[0].id) { select(scenes[0]); save(); }
+			else { image.style.visibility = "hidden"; error.hidden = false; }
+		};
+		image.addEventListener("error", imageFailure);
+		if (image.complete && image.naturalWidth === 0) imageFailure();
+		matchMedia("(max-width: 600px)").addEventListener("change", () => {
+			original.href = matchMedia("(max-width: 600px)").matches ? selected.mobile : selected.desktop;
+		});
+	}
+</script>

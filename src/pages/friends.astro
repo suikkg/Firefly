@@ -11,13 +11,12 @@ import {
 } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import LabPage from "@/layouts/LabPage.astro";
-import { hueFromString } from "@/utils/lab-utils";
-import "@/styles/lab-prose.css";
+import SitePage from "@/layouts/SitePage.astro";
+import "@/styles/site-prose.css";
 
 // 页面开关关闭时保持与旧版一致的行为
 if (!siteConfig.pages.friends) {
-	return Astro.redirect("/404/");
+	return Astro.redirect("/404.html");
 }
 
 // 说明：spec/friends.mdx 是主题自带的模板，整篇用 Tailwind 工具类写成
@@ -44,7 +43,7 @@ const description =
 	friendsPageConfig.description || i18n(I18nKey.friendsDescription);
 ---
 
-<LabPage title={title} description={description} lede={description}>
+<SitePage title={title} description={description} lede={description}>
 	{
 		allTags.length > 0 && (
 			<div class="tag-filter" role="group" aria-label="按标签筛选">
@@ -75,7 +74,7 @@ const description =
 						target="_blank"
 						rel="noopener noreferrer"
 						data-tags={JSON.stringify(f.tags || [])}
-						style={`--h:${hueFromString(f.title)}`}
+
 					>
 						<img
 							class="avatar"
@@ -137,7 +136,7 @@ const description =
 			</section>
 		)
 	}
-</LabPage>
+</SitePage>
 
 <style>
 	.chip[hidden],
@@ -174,7 +173,7 @@ const description =
 	}
 
 	.chip:hover { transform: translateY(-2px); }
-	.chip.is-on { background: var(--accent); color: #fff; }
+	.chip.is-on { background: var(--accent-wash); color: var(--ink); }
 
 	.chip-n {
 		font-family: var(--mono);
@@ -206,7 +205,7 @@ const description =
 		position: absolute;
 		inset: 0 auto 0 0;
 		width: 3px;
-		background: oklch(0.72 0.12 var(--h));
+		background: var(--accent);
 	}
 
 	.avatar {
@@ -226,8 +225,8 @@ const description =
 		font-weight: 650;
 		letter-spacing: -0.012em;
 		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		white-space: normal;
+		overflow-wrap: anywhere;
 	}
 
 	.friend-desc {
@@ -275,7 +274,7 @@ const description =
 		.friend:hover .friend-arrow {
 			opacity: 1;
 			transform: none;
-			color: oklch(0.58 0.13 var(--h));
+			color: var(--accent-deep);
 		}
 	}
 
@@ -310,6 +309,7 @@ const description =
 
 	.self-fields {
 		display: grid;
+		grid-template-columns: minmax(0, 1fr);
 		gap: 0.5rem;
 		margin: 0;
 	}
@@ -325,7 +325,8 @@ const description =
 		box-shadow: var(--lift-1);
 	}
 
-	.field-text { min-width: 0; }
+	.field { min-width: 0; }
+	.field-text { min-width: 0; flex: 1; }
 
 	.field dt { margin: 0 0 0.15rem; }
 
@@ -334,16 +335,16 @@ const description =
 		font-size: 0.85rem;
 		font-weight: 500;
 		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		white-space: normal;
+		overflow-wrap: anywhere;
 	}
 
 	.copy {
 		display: grid;
 		place-items: center;
 		flex-shrink: 0;
-		width: 1.9rem;
-		height: 1.9rem;
+		width: 2.75rem;
+		height: 2.75rem;
 		border: 0;
 		border-radius: var(--radius-sm);
 		background: var(--accent-wash);
@@ -353,13 +354,13 @@ const description =
 		transition: background-color 0.25s var(--ease-out);
 	}
 
-	.copy:hover { background: var(--accent); color: #fff; }
+	.copy:hover { background: var(--accent-wash); color: var(--ink); }
 
 	/* 复制成功时把图标换成对勾 */
 	.copy .copy-done { display: none; }
 	.copy.is-done .copy-idle { display: none; }
 	.copy.is-done .copy-done { display: block; }
-	.copy.is-done { background: var(--accent); color: #fff; }
+	.copy.is-done { background: var(--accent-wash); color: var(--ink); }
 
 	.comments {
 		margin-top: clamp(2.5rem, 6vw, 4rem);

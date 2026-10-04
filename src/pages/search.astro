@@ -4,7 +4,7 @@
 import { Icon } from "astro-icon/components";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import LabPage from "@/layouts/LabPage.astro";
+import SitePage from "@/layouts/SitePage.astro";
 import { getSortedPostsList } from "@/utils/content-utils";
 import { url } from "@/utils/url-utils";
 
@@ -19,73 +19,28 @@ const index = posts.map((p) => ({
 
 const title = i18n(I18nKey.search);
 ---
-
-<LabPage title={title} description="搜索文章标题、标签与正文" lede="标题与标签即时匹配，正文走全文检索。">
-	<div class="box" role="search">
-		<Icon is:inline name="lucide:search" class="box-icon" />
-		<input
-			id="q"
-			type="search"
-			placeholder="输入关键词…"
-			autocomplete="off"
-			aria-label="搜索"
-		/>
-		<button id="clear" type="button" aria-label="清空" hidden>
-			<Icon is:inline name="lucide:x" />
-		</button>
-	</div>
-
-	<p class="hint" id="hint">输入任意关键词开始搜索。</p>
-
-	<section class="block" id="quick-block" hidden>
-		<h2 class="block-title micro">标题与标签</h2>
-		<ul class="hits" id="quick"></ul>
-	</section>
-
-	<section class="block" id="full-block" hidden>
-		<h2 class="block-title micro">正文</h2>
-		<ul class="hits" id="full"></ul>
-		<p class="pf-note" id="pf-note" hidden>全文索引尚未就绪（开发模式下不生成）。</p>
-	</section>
-</LabPage>
-
-<script id="quick-index" type="application/json" set:html={JSON.stringify(index)} is:inline />
-
-{
-	import.meta.env.PROD && (
-		<script is:inline define:vars={{ scriptUrl: url("/pagefind/pagefind.js") }}>
-			{`
-			(async () => {
-				try {
-					const u = scriptUrl.replace(/\\/$/, "");
-					const res = await fetch(u, { method: "HEAD" });
-					if (res.status !== 200) throw new Error("missing");
-					const pf = await import(u);
-					await pf.options({ excerptLength: 24 });
-					window.pagefind = pf;
-					window.dispatchEvent(new Event("pagefindready"));
-				} catch {
-					window.dispatchEvent(new Event("pagefinderror"));
-				}
-			})();
-			`}
-		</script>
-	)
-}
-
+<SitePage title={title} description="搜索文章标题、标签与公开正文" lede="标题、标签与公开正文都可检索；受保护笔记仅匹配公开信息。">
+ <div class="box" role="search"><Icon name="lucide:search" /><input id="q" type="search" placeholder="输入关键词…" aria-label="搜索笔记" autocomplete="off" /><button id="clear" type="button" aria-label="清空" hidden><Icon name="lucide:x" /></button></div>
+ <p class="hint" id="hint" role="status" aria-live="polite">输入关键词开始搜索。</p>
+ <section class="block" id="quick-block" hidden><h2 class="block-title">标题与标签</h2><ul class="hits" id="quick"></ul></section>
+ <section class="block" id="full-block" hidden><h2 class="block-title">公开正文</h2><ul class="hits" id="full"></ul></section>
+ <p class="pf-note" id="pf-note" role="status" hidden></p><button id="retry-search" type="button" hidden>重试全文检索</button>
+</SitePage>
+<script id="quick-index" type="application/json" data-pagefind-url={url("/pagefind/pagefind.js")} set:html={JSON.stringify(index).replaceAll("<", "\\u003c")} is:inline />
 <style>
 	.box {
 		display: flex;
 		align-items: center;
 		gap: 0.65rem;
 		padding: 0.85rem 1.15rem;
-		border-radius: 999px;
+		border: 1px solid var(--hair);
+		border-radius: var(--radius);
 		background: var(--card);
 		box-shadow: var(--lift-1);
 		transition: box-shadow 0.3s var(--ease-out);
 	}
 
-	.box:focus-within { box-shadow: var(--lift-2); }
+	.box:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
 	.box-icon { color: var(--ink-mute); flex-shrink: 0; }
 
 	.box input {
@@ -107,8 +62,8 @@ const title = i18n(I18nKey.search);
 	.box button {
 		display: grid;
 		place-items: center;
-		width: 1.5rem;
-		height: 1.5rem;
+		width: 44px;
+		height: 44px;
 		border: 0;
 		border-radius: 50%;
 		background: var(--accent-wash);
@@ -192,119 +147,80 @@ const title = i18n(I18nKey.search);
 		padding: 0 0.15em;
 	}
 </style>
-
 <script>
-	type Entry = { t: string; g: string[]; c: string; u: string; d: string };
-
-	const el = document.getElementById("quick-index");
-	const entries: Entry[] = el ? JSON.parse(el.textContent || "[]") : [];
-
-	const input = document.getElementById("q") as HTMLInputElement | null;
-	const clear = document.getElementById("clear") as HTMLButtonElement | null;
-	const hint = document.getElementById("hint");
-	const quickBlock = document.getElementById("quick-block");
-	const fullBlock = document.getElementById("full-block");
-	const quick = document.getElementById("quick");
-	const full = document.getElementById("full");
-	const pfNote = document.getElementById("pf-note");
-
-	let pagefindFailed = false;
-	window.addEventListener("pagefinderror", () => { pagefindFailed = true; });
-
-	function esc(v: string): string {
-		return v.replace(/[&<>"']/g, (c) => ({
-			"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-		})[c] as string);
-	}
-
-	function row(href: string, titleHtml: string, meta: string, excerpt?: string): string {
-		return `<li><a href="${href}">
-			<div class="h-title">${titleHtml}</div>
-			<div class="h-meta">${meta}</div>
-			${excerpt ? `<p class="h-excerpt">${excerpt}</p>` : ""}
-		</a></li>`;
-	}
-
-	function runQuick(q: string): number {
-		if (!quick || !quickBlock) return 0;
-		const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
-		const hits = entries.filter((e) => {
-			const hay = `${e.t} ${e.g.join(" ")} ${e.c}`.toLowerCase();
-			return terms.every((t) => hay.includes(t));
-		});
-		quick.innerHTML = hits
-			.map((e) => row(e.u, esc(e.t), `${esc(e.c)} · ${esc(e.d.replace(/-/g, "/"))}`))
-			.join("");
-		quickBlock.hidden = hits.length === 0;
-		return hits.length;
-	}
-
-	async function runFull(q: string): Promise<number> {
-		if (!full || !fullBlock) return 0;
-		const pf = (window as any).pagefind;
-		if (!pf) {
-			// 开发模式或索引缺失：只提示，不影响标题/标签的即时匹配
-			fullBlock.hidden = !pagefindFailed;
-			if (pfNote) pfNote.hidden = !pagefindFailed;
-			full.innerHTML = "";
-			return 0;
-		}
-		if (pfNote) pfNote.hidden = true;
-		const search = await pf.search(q);
-		const items = await Promise.all(search.results.slice(0, 10).map((r: any) => r.data()));
-		full.innerHTML = items
-			.map((d: any) => row(d.url, esc(d.meta?.title || d.url), esc(d.url), d.excerpt))
-			.join("");
-		fullBlock.hidden = items.length === 0;
-		return items.length;
-	}
-
-	async function run(raw: string): Promise<void> {
-		const q = raw.trim();
-		if (clear) clear.hidden = q.length === 0;
-
-		if (!q) {
-			if (hint) { hint.hidden = false; hint.textContent = "输入任意关键词开始搜索。"; }
-			if (quickBlock) quickBlock.hidden = true;
-			if (fullBlock) fullBlock.hidden = true;
-			return;
-		}
-
-		const n1 = runQuick(q);
-		const n2 = await runFull(q);
-		if (hint) {
-			hint.hidden = n1 + n2 > 0;
-			hint.textContent = "没有匹配的内容。";
-		}
-	}
-
-	let timer: number | undefined;
-	input?.addEventListener("input", () => {
-		window.clearTimeout(timer);
-		timer = window.setTimeout(() => {
-			run(input.value);
-			const u = new URL(location.href);
-			if (input.value.trim()) u.searchParams.set("q", input.value.trim());
-			else u.searchParams.delete("q");
-			history.replaceState(null, "", u);
-		}, 150);
-	});
-
-	clear?.addEventListener("click", () => {
-		if (!input) return;
-		input.value = "";
-		run("");
-		input.focus();
-	});
-
-	// ?q= 直达，并在 pagefind 就绪后补跑一次全文
-	const initial = new URLSearchParams(location.search).get("q") ?? "";
-	if (initial && input) {
-		input.value = initial;
-		run(initial);
-	}
-	window.addEventListener("pagefindready", () => {
-		if (input?.value.trim()) run(input.value);
-	});
-	input?.focus();
+ type Entry = { t: string; g: string[]; c: string; u: string; d: string };
+ type SearchData = { url: string; meta: { title?: string }; excerpt: string };
+ type Pagefind = { options: (options: { excerptLength: number }) => Promise<void>; search: (query: string) => Promise<{ results: { data: () => Promise<SearchData> }[] }> };
+ const indexEl = document.getElementById("quick-index");
+ const entries: Entry[] = JSON.parse(indexEl?.textContent || "[]");
+ const input = document.getElementById("q") as HTMLInputElement;
+ const clear = document.getElementById("clear") as HTMLButtonElement;
+ const hint = document.getElementById("hint")!;
+ const quickBlock = document.getElementById("quick-block")!;
+ const fullBlock = document.getElementById("full-block")!;
+ const quick = document.getElementById("quick")!;
+ const full = document.getElementById("full")!;
+ const note = document.getElementById("pf-note")!;
+ const retry = document.getElementById("retry-search")!;
+ let generation = 0;
+ let timer: number | undefined;
+ let ready: Promise<Pagefind> | undefined;
+	let attempts = 0;
+ function loadIndex(): Promise<Pagefind> {
+  if (!ready) ready = (async () => {
+   if (import.meta.env.DEV) throw new Error("development");
+   const path = indexEl?.dataset.pagefindUrl || "/pagefind/pagefind.js";
+   const pf = await import(/* @vite-ignore */ attempts++ ? `${path}?retry=${attempts}` : path) as Pagefind;
+   await pf.options({ excerptLength: 24 });
+   return pf;
+  })();
+  return ready;
+ }
+ function esc(value: string): string { return value.replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!); }
+ function excerptHtml(value: string): string {
+  const body = new DOMParser().parseFromString(value, "text/html").body;
+  function render(node: Node): string {
+   if (node.nodeType === Node.TEXT_NODE) return esc(node.textContent || "");
+   if (!(node instanceof Element) || ["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED"].includes(node.tagName)) return "";
+   const content = Array.from(node.childNodes).map(render).join("");
+   return node.tagName === "MARK" ? `<mark>${content}</mark>` : content;
+  }
+  return Array.from(body.childNodes).map(render).join("");
+ }
+ function row(href: string, title: string, metadata: string, excerpt = ""): string {
+  return `<li><a href="${esc(href)}"><div class="h-title">${esc(title)}</div><div class="h-meta">${esc(metadata)}</div>${excerpt ? `<p class="h-excerpt">${excerptHtml(excerpt)}</p>` : ""}</a></li>`;
+ }
+ function syncUrl(query: string): void { const u = new URL(location.href); if (query) u.searchParams.set("q", query); else u.searchParams.delete("q"); history.replaceState(null, "", u); }
+ async function run(): Promise<void> {
+  const request = ++generation;
+  const query = input.value.trim();
+  syncUrl(query); clear.hidden = !query; fullBlock.hidden = true; note.hidden = true; retry.hidden = true; full.replaceChildren();
+  if (!query) { quickBlock.hidden = true; quick.replaceChildren(); hint.hidden = false; hint.textContent = "输入关键词开始搜索。"; return; }
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const hits = entries.filter(entry => terms.every(term => `${entry.t} ${entry.g.join(" ")} ${entry.c}`.toLowerCase().includes(term)));
+  quick.innerHTML = hits.map(entry => row(entry.u, entry.t, `${entry.c} · ${entry.d}`)).join(""); quickBlock.hidden = !hits.length;
+  hint.hidden = false; hint.textContent = "正在检索公开正文…";
+  try {
+   const pf = await loadIndex();
+   const search = await pf.search(query);
+   const data = await Promise.all(search.results.slice(0, 30).map(result => result.data()));
+   if (request !== generation) return;
+   const seen = new Set(hits.map(hit => hit.u));
+   const unique = data.filter(result => { const path = new URL(result.url, location.origin).pathname; if (!path.startsWith("/posts/") || seen.has(path)) return false; seen.add(path); return true; });
+   full.innerHTML = unique.map(result => row(result.url, result.meta.title || result.url, "正文匹配", result.excerpt)).join("");
+   fullBlock.hidden = !unique.length; hint.textContent = hits.length + unique.length ? `找到 ${hits.length + unique.length} 篇笔记。` : "没有匹配的笔记，试试其他关键词。";
+  } catch {
+   if (request !== generation) return;
+   hint.textContent = hits.length ? `找到 ${hits.length} 篇标题或标签匹配的笔记。` : "标题与标签没有匹配的笔记。";
+   note.hidden = false; note.textContent = import.meta.env.DEV ? "开发预览未生成全文索引；请在生产构建后验证全文检索。" : "全文检索暂不可用，仍可搜索标题与标签。"; retry.hidden = import.meta.env.DEV;
+  }
+ }
+ input.addEventListener("input", () => { generation++; clearTimeout(timer); timer = window.setTimeout(run, 150); });
+ function reset(): void { clearTimeout(timer); input.value = ""; void run(); input.focus(); }
+ clear.addEventListener("click", reset);
+ input.addEventListener("keydown", event => { if (event.key === "Escape") reset(); });
+ retry.addEventListener("click", () => { ready = undefined; void run(); });
+ input.value = new URLSearchParams(location.search).get("q") || "";
+ input.focus({ preventScroll: true });
+ void run();
 </script>

@@ -2,7 +2,7 @@ name: Build and Check
 
 on:
   push:
-    branches: [ master ] # Adjust branches as needed
+    branches: [ master, "codex/**" ]
   pull_request:
     branches: [ master ] # Adjust branches as needed
 
@@ -17,7 +17,7 @@ jobs:
   check:
     strategy:
       matrix:
-        node: [ 22, 23 ]
+        node: [ 24 ]
     runs-on: ubuntu-latest
     name: Astro Check for Node.js ${{ matrix.node }}
     steps:
@@ -38,12 +38,15 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run Astro Check
-        run: pnpm astro check
+        run: pnpm check
+
+      - name: Run TypeScript Check
+        run: pnpm type-check
 
   build:
     strategy:
       matrix:
-        node: [ 22, 23 ]
+        node: [ 24 ]
     runs-on: ubuntu-latest
     name: Astro Build for Node.js ${{ matrix.node }} # Corrected job name
     steps:
@@ -64,4 +67,4 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run Astro Build
-        run: pnpm astro build
+        run: pnpm build

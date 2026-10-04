@@ -5,7 +5,7 @@ published: 2025-12-27
 pinned: false
 description: 自用工具，用例结束处理中的失败也会记录
 tags: [软件测试, RIDE, python]
-category: Tools
+category: 自动化工具
 licenseName: "Unlicensed"
 author: suikk
 sourceLink: "https://github.com/emn178/markdown"

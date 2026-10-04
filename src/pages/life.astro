@@ -1,0 +1,170 @@
+---
+import { getCollection } from "astro:content";
+import { Icon } from "astro-icon/components";
+import { dynamicConfig, galleryConfig, siteConfig } from "@/config";
+import SitePage from "@/layouts/SitePage.astro";
+import { dynamicPlainText, hasLocalDynamicContent, sortDynamics } from "@/utils/dynamic-utils";
+import { getAlbumCover, scanAlbumPhotos } from "@/utils/gallery-utils";
+import { url } from "@/utils/url-utils";
+
+// 只在生活入口展示公开相册的封面，受保护相册仍从相册页进入。
+const publicAlbums = galleryConfig.albums.filter((album) => !album.password);
+const featuredAlbum = publicAlbums[0];
+const albumPhotos = featuredAlbum ? scanAlbumPhotos(featuredAlbum.id) : [];
+const albumCover = featuredAlbum
+	? getAlbumCover(featuredAlbum, albumPhotos)
+	: "";
+const hasLocalDynamics = hasLocalDynamicContent();
+const usesLocalDynamics =
+	!dynamicConfig.memos?.enable &&
+	(!dynamicConfig.apiUrl || dynamicConfig.apiUrl === "/api/dynamic.json");
+const dynamics =
+	usesLocalDynamics && hasLocalDynamics
+		? sortDynamics(await getCollection("dynamic"))
+		: [];
+const latestDynamic = dynamics[0];
+const hasCollections = siteConfig.pages.bangumi || siteConfig.pages.anime;
+---
+
+<SitePage
+	title="生活"
+	description="KK 的图像、音乐与日常记录。"
+	lede="相册、音乐与近况。"
+>
+	<div class="life-grid">
+		{
+			siteConfig.pages.gallery && (
+				<a class="gallery-door" href={url("/gallery/")}>
+					<div class="gallery-art">
+						{albumCover ? (
+							<img
+								src={albumCover}
+								alt={featuredAlbum ? `「${featuredAlbum.name}」相册封面` : "相册封面"}
+								width="720"
+								height="480"
+								loading="eager"
+							/>
+						) : (
+							<svg class="gallery-sketch" viewBox="0 0 640 360" fill="none" aria-hidden="true">
+								<path class="sketch-frame" d="M120 80h330v210H120z" />
+								<path class="sketch-land" d="m120 260 100-94 74 72 83-129 73 110" />
+								<circle class="sketch-sun" cx="360" cy="133" r="23" />
+								<path class="sketch-frame" d="M152 59h330v210M98 108v202h330" />
+							</svg>
+						)}
+					</div>
+					<div class="gallery-copy">
+						<div>
+							<h2>把喜欢的图像留下来</h2>
+							<p>相册{featuredAlbum && <span>里有「{featuredAlbum.name}」</span>}。</p>
+						</div>
+						<span class="door-action">打开相册 <Icon is:inline name="lucide:arrow-up-right" /></span>
+					</div>
+				</a>
+			)
+		}
+
+		<a class="music-door" href={url("/music/")}>
+			<div class="record-art" aria-hidden="true">
+				<div class="record-grooves"><span></span></div>
+				<svg class="record-arm" viewBox="0 0 180 180" fill="none">
+					<path d="M150 25v60l-32 38" />
+					<circle cx="150" cy="25" r="7" />
+					<path d="m110 125 13 10 13-18-13-9z" />
+				</svg>
+			</div>
+			<div class="music-copy">
+				<h2>换一种节奏</h2>
+				<p>粤语歌单，按需播放。</p>
+				<span class="door-action">听听音乐 <Icon is:inline name="lucide:arrow-up-right" /></span>
+			</div>
+		</a>
+	</div>
+
+	<div class="life-bottom">
+		{
+			siteConfig.pages.dynamic && (
+				<section class="life-update" aria-labelledby="life-update-title">
+					<h2 id="life-update-title">最近的短记录</h2>
+					{latestDynamic ? (
+						<>
+							<time datetime={latestDynamic.data.published.toISOString()}>
+								{latestDynamic.data.published.toLocaleDateString("zh-CN", {
+									timeZone: siteConfig.timezone || "Asia/Shanghai",
+									year: "numeric",
+									month: "long",
+									day: "numeric",
+								})}
+							</time>
+							<p>{dynamicPlainText(latestDynamic).slice(0, 140)}{dynamicPlainText(latestDynamic).length > 140 ? "…" : ""}</p>
+						</>
+					) : (
+						<p>{usesLocalDynamics ? "还没有公开的短记录。" : "查看最新近况。"}</p>
+					)}
+					<a href={url("/dynamic/")}>查看近况</a>
+				</section>
+			)
+		}
+		{
+			hasCollections && (
+				<section class="life-collections" aria-labelledby="life-collections-title">
+					<h2 id="life-collections-title">收藏</h2>
+					<nav aria-label="平台收藏" class="collection-links">
+						{siteConfig.pages.bangumi && <a href={url("/bangumi/")}><Icon is:inline name="lucide:bookmark" /><span>Bangumi 收藏</span></a>}
+						{siteConfig.pages.anime && <a href={url("/anime/")}><Icon is:inline name="lucide:clapperboard" /><span>Bilibili 片单</span></a>}
+					</nav>
+				</section>
+			)
+		}
+		<section class="life-tools"><h2>工具</h2><nav class="collection-links" aria-label="个人工具"><a href="/muscle/"><Icon name="lucide:box" /><span>人体肌群图谱</span></a></nav></section>
+	</div>
+</SitePage>
+
+<style>
+	.life-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 24px; }
+	.gallery-door, .music-door { min-width: 0; color: var(--ink); text-decoration: none; border: 1px solid var(--hair); border-radius: var(--radius); overflow: hidden; background: var(--card); }
+	.gallery-door { display: flex; flex-direction: column; }
+	.gallery-art { aspect-ratio: 16 / 9; overflow: hidden; background: var(--accent-wash); }
+	.gallery-art img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: center 35%; }
+	.gallery-sketch { width: 100%; height: 100%; }
+	.sketch-frame { stroke: var(--signal-secondary); stroke-width: 2; }
+	.sketch-land { stroke: var(--accent); stroke-width: 3; }
+	.sketch-sun { fill: var(--life-accent); }
+	.gallery-copy { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px; flex: 1; }
+	h2 { margin: 0; font-size: clamp(20px, 2.1vw, 25px); line-height: 1.45; font-weight: 650; letter-spacing: -0.02em; }
+	.gallery-copy p, .music-copy p { margin: 8px 0 0; font-size: 14px; line-height: 1.8; color: var(--ink-soft); }
+	.door-action { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 550; color: var(--accent); white-space: nowrap; min-height: 44px; }
+	.door-action svg { width: 17px; height: 17px; }
+	.gallery-door:hover, .music-door:hover { border-color: var(--accent); }
+	.music-door { position: relative; display: flex; flex-direction: column; justify-content: space-between; padding: 24px 32px; background: var(--card-soft); }
+	.record-art { position: relative; width: min(100%, 250px); aspect-ratio: 1; align-self: center; margin-block: 8px 16px; }
+	.record-grooves { position: absolute; inset: 5%; border-radius: 50%; border: 1px solid var(--hair); background: repeating-radial-gradient(circle, var(--card) 0 6px, var(--hair) 7px, var(--card) 8px 13px); display: grid; place-items: center; }
+	.record-grooves::after { content: ""; position: absolute; inset: 30%; border-radius: 50%; background: var(--accent-wash); border: 1px solid var(--signal-secondary); }
+	.record-grooves span { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); z-index: 1; }
+	.record-arm { position: absolute; inset: 0; width: 100%; height: 100%; stroke: var(--life-accent); stroke-width: 5; stroke-linejoin: round; }
+	.record-arm circle, .record-arm path:last-child { fill: var(--card); }
+	.music-copy .door-action { margin-top: 16px; }
+	.life-bottom { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 24px; margin-top: 48px; }
+	.life-bottom section { min-width: 0; padding-top: 24px; border-top: 1px solid var(--hair); }
+	.life-bottom h2 { font-size: 20px; }
+	.life-bottom p { max-width: 34em; margin: 16px 0; font-size: 14px; line-height: 1.9; color: var(--ink-soft); }
+	.life-update time { display: block; margin-top: 16px; font-size: 12px; color: var(--ink-soft); }
+	.life-update > a { display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; text-decoration: none; }
+	.life-update > a:hover { text-decoration: underline; }
+	.collection-links { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+	.collection-links a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; text-decoration: none; }
+	.collection-links a:hover { text-decoration: underline; }
+	.collection-links svg { width: 16px; height: 16px; }
+	@media (max-width: 900px) { .gallery-copy { align-items: flex-start; flex-direction: column; gap: 4px; } .music-door { padding: 24px; } }
+	@media (max-width: 600px) {
+		.life-grid, .life-bottom { grid-template-columns: 1fr; gap: 24px; }
+		.gallery-copy { padding: 20px; gap: 4px; }
+		.gallery-art { aspect-ratio: 4 / 3; }
+		.music-door { flex-direction: row; align-items: center; gap: 20px; padding: 24px 20px; }
+		.record-art { width: 104px; flex-shrink: 0; margin: 0; }
+		.music-copy { min-width: 0; }
+		.music-copy h2 { font-size: 20px; }
+		.music-copy .door-action { margin-top: 8px; }
+		.life-bottom { margin-top: 32px; }
+	}
+</style>

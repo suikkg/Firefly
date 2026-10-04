@@ -1,4 +1,19 @@
 import type { CollectionEntry } from "astro:content";
+import { readdirSync } from "node:fs";
+
+/** Match the recursive Markdown loader without treating an empty site as an error. */
+export function hasLocalDynamicContent(
+	directory = "src/content/dynamic",
+): boolean {
+	try {
+		return readdirSync(directory, {
+			recursive: true,
+			withFileTypes: true,
+		}).some((entry) => entry.isFile() && entry.name.endsWith(".md"));
+	} catch {
+		return false;
+	}
+}
 
 export const sortDynamics = (
 	entries: CollectionEntry<"dynamic">[],

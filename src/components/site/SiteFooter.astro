@@ -1,0 +1,17 @@
+---
+import { profileConfig } from "@/config";
+
+const contacts = profileConfig.links.filter((link) =>
+	["GitHub", "Email"].includes(link.name),
+);
+---
+<footer class="site-footer">
+	<div class="footer-signature">
+		<span class="footer-name">KK 个人博客</span>
+	</div>
+	<nav aria-label="页脚导航">
+		<a href="/rss/">订阅文章</a>
+		{contacts.map(link => <a href={link.url}>{link.name === "Email" ? "邮件" : link.name}</a>)}
+		<a href="/about/#站点说明">站点说明</a>
+	</nav>
+</footer>

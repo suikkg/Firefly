@@ -1,0 +1,25 @@
+---
+import SiteHead from "@/components/site/SiteHead.astro";
+import SiteHeader from "@/components/site/SiteHeader.astro";
+import SiteFooter from "@/components/site/SiteFooter.astro";
+import { siteConfig } from "@/config";
+import "@/styles/site.css";
+interface Props {
+	title: string;
+	description?: string;
+	lede?: string;
+	intro?: boolean;
+}
+const { title, description, lede, intro = true } = Astro.props;
+---
+<html lang={siteConfig.lang.replace("_", "-")}>
+	<head><SiteHead title={title} description={description} /><slot name="head" /></head>
+	<body><div class="site-shell">
+		<SiteHeader />
+		<main id="main-content" class="site-main">
+			{intro && <div class="page-intro"><h1>{title}</h1>{lede && <p>{lede}</p>}</div>}
+			<slot />
+		</main>
+		<SiteFooter />
+	</div></body>
+</html>

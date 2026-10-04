@@ -1,0 +1,194 @@
+---
+import { Icon } from "astro-icon/components";
+import FancyboxManager from "@/components/features/FancyboxManager.astro";
+import { siteConfig } from "@/config";
+import { characterScenes } from "@/config/characterConfig";
+import SitePage from "@/layouts/SitePage.astro";
+import { url } from "@/utils/url-utils";
+
+if (!siteConfig.pages.gallery) {
+	return Astro.redirect("/404.html");
+}
+
+const characters = [
+	...new Set(characterScenes.map((scene) => scene.character)),
+];
+---
+
+<SitePage title="角色图库" description="浏览角色场景图，选择博客首页图片。" lede="挑一张喜欢的场景，放在首页。">
+	<div class="gallery-toolbar">
+		<div class="character-filter" role="group" aria-label="按角色筛选">
+			<button type="button" data-character-filter="" aria-pressed="true" disabled>全部 <span>{characterScenes.length}</span></button>
+			{characters.map((character) => (
+				<button type="button" data-character-filter={character} aria-pressed="false" disabled>
+					{character}<span>{characterScenes.filter((scene) => scene.character === character).length}</span>
+				</button>
+			))}
+		</div>
+		<a class="album-return" href={url("/gallery/")}><Icon is:inline name="lucide:arrow-left" /><span>全部相册</span></a>
+	</div>
+	<p class="gallery-status" id="character-filter-status" role="status" aria-live="polite" aria-atomic="true">共 {characterScenes.length} 个场景。</p>
+	<div class="selection-state" id="character-selection-state" role="status" aria-live="polite" aria-atomic="true">首页图片选择只保存在当前浏览器。</div>
+	<noscript><p class="no-script">启用 JavaScript 后可筛选角色并设置首页图片。场景原图仍可直接打开。</p></noscript>
+
+	<div class="character-scenes" id="character-scenes" data-home-url={url("/#home-art")} data-default-scene-id={characterScenes[0]?.id || ""}>
+		{characterScenes.map((scene, index) => (
+			<article class="scene" data-character={scene.character} data-scene-id={scene.id}>
+				<a class="scene-preview" href={url(scene.desktop)} data-fancybox="character-scenes" data-character-lightbox aria-label={`查看「${scene.title}」大图`}>
+					<img
+						src={url(scene.thumbnail)}
+						alt={`${scene.character}：${scene.title}`}
+						width="960"
+						height="600"
+						loading={index < 3 ? "eager" : "lazy"}
+						decoding="async"
+						style={`object-position: ${scene.position}`}
+					/>
+					<span class="preview-failure" data-preview-failure hidden>预览暂时无法加载，打开原图查看。</span>
+					<span class="selected-label" data-scene-selected hidden>当前首页图片</span>
+					<span class="preview-action" aria-hidden="true"><Icon is:inline name="lucide:expand" /></span>
+				</a>
+				<div class="scene-body">
+					<p class="scene-meta"><span>{scene.character}</span><span>{scene.game}</span></p>
+					<h2>{scene.title}</h2>
+					<div class="scene-actions">
+						<button type="button" class="set-scene" data-set-scene={scene.id} data-scene-title={scene.title} aria-pressed="false" disabled>设为首页图片</button>
+						{scene.mobile !== scene.desktop && <a href={url(scene.mobile)} data-fancybox="character-scenes" data-character-lightbox>手机版大图</a>}
+					</div>
+					<details class="scene-source">
+						<summary>图片来源</summary>
+						<p>{scene.sourceNote}</p>
+						{scene.sourceUrl && <a href={scene.sourceUrl} target="_blank" rel="noopener noreferrer">查看来源页面 <Icon is:inline name="lucide:external-link" /></a>}
+					</details>
+				</div>
+			</article>
+		))}
+	</div>
+	<p class="gallery-empty" id="character-no-match" hidden>没有找到这个角色的场景，请选择“全部”。</p>
+	{characterScenes.length === 0 && <p class="gallery-empty">还没有添加角色场景。</p>}
+	<FancyboxManager />
+</SitePage>
+
+<style>
+	.scene[hidden], .preview-failure[hidden], .selected-label[hidden], .gallery-empty[hidden] { display: none; }
+	.gallery-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+	.character-filter { display: flex; flex-wrap: wrap; gap: 8px; }
+	.character-filter button { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 14px; border: 1px solid var(--hair); border-radius: var(--radius-sm); background: var(--card); color: var(--ink-soft); font-size: 13px; }
+	.character-filter button span { font-size: 12px; font-variant-numeric: tabular-nums; }
+	.character-filter button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-wash); color: var(--accent); font-weight: 600; }
+	.character-filter button:hover { border-color: var(--accent); }
+	.album-return { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--ink-soft); font-size: 13px; text-decoration: none; }
+	.album-return:hover { color: var(--accent); }
+	.album-return svg { width: 16px; height: 16px; }
+	.gallery-status { margin: 16px 0 12px; color: var(--ink-soft); font-size: 12px; line-height: 1.7; }
+	.selection-state { margin-bottom: 24px; padding: 12px 16px; border-left: 2px solid var(--accent); background: var(--accent-wash); font-size: 13px; line-height: 1.8; }
+	.no-script { margin-bottom: 24px; color: var(--ink-soft); font-size: 13px; line-height: 1.8; }
+	.character-scenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 24px; }
+	.scene { min-width: 0; background: var(--card); border: 1px solid var(--hair); border-radius: var(--radius); overflow: hidden; }
+	.scene.is-selected { border-color: var(--accent); }
+	.scene:focus-within { border-color: var(--accent); }
+	.scene-preview { position: relative; display: block; aspect-ratio: 8 / 5; background: var(--accent-wash); overflow: hidden; color: var(--ink); text-decoration: none; }
+	.scene-preview:focus-visible { outline-offset: -4px; }
+	.scene-preview img { width: 100%; height: 100%; display: block; object-fit: cover; }
+	.preview-failure { display: grid; place-items: center; height: 100%; padding: 24px; text-align: center; font-size: 13px; line-height: 1.8; }
+	.selected-label { position: absolute; left: 12px; top: 12px; padding: 6px 10px; border-radius: var(--radius-sm); background: var(--card); color: var(--accent); font-size: 12px; font-weight: 600; }
+	.preview-action { position: absolute; right: 12px; bottom: 12px; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--hair); border-radius: var(--radius-sm); background: var(--card); color: var(--ink); }
+	.preview-action svg { width: 16px; height: 16px; }
+	.scene-body { padding: 20px; }
+	.scene-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 8px; font-size: 12px; line-height: 1.7; color: var(--ink-soft); }
+	.scene h2 { margin: 0; font-size: 20px; line-height: 1.5; font-weight: 650; letter-spacing: -0.015em; }
+	.scene-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-top: 20px; }
+	.set-scene { min-height: 44px; padding: 10px 14px; border: 1px solid var(--accent); border-radius: var(--radius-sm); background: var(--accent-wash); color: var(--accent); font-size: 13px; font-weight: 550; }
+	.set-scene:hover { background: var(--card); }
+	.scene-actions a { display: inline-flex; align-items: center; min-height: 44px; font-size: 12px; text-decoration: none; }
+	.scene-actions a:hover { text-decoration: underline; }
+	.scene-source { padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--hair); font-size: 12px; line-height: 1.8; color: var(--ink-soft); }
+	.scene-source summary { cursor: pointer; min-height: 44px; padding-block: 8px; }
+	.scene-source p { margin: 8px 0; }
+	.scene-source a { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; }
+	.scene-source svg { width: 13px; height: 13px; }
+	.gallery-empty { padding: 32px 0; color: var(--ink-soft); font-size: 14px; line-height: 1.8; }
+	@media (max-width: 600px) { .character-scenes { gap: 20px; } .scene-body { padding: 20px; } .scene h2 { font-size: 19px; } }
+</style>
+
+<script>
+	const storageKey = "kk-character-scene-v1";
+	const gallery = document.getElementById("character-scenes");
+	const cards = [...document.querySelectorAll<HTMLElement>(".scene[data-scene-id]")];
+	const filters = [...document.querySelectorAll<HTMLButtonElement>("[data-character-filter]")];
+	const selectionButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-set-scene]")];
+	const filterStatus = document.getElementById("character-filter-status");
+	const selectionState = document.getElementById("character-selection-state");
+	const noMatch = document.getElementById("character-no-match");
+	const defaultSceneId = gallery?.dataset.defaultSceneId || null;
+
+	function showSelection(id: string | null): void {
+		for (const card of cards) {
+			const isSelected = card.dataset.sceneId === id;
+			card.classList.toggle("is-selected", isSelected);
+			const label = card.querySelector<HTMLElement>("[data-scene-selected]");
+			if (label) label.hidden = !isSelected;
+			card.querySelector("[data-set-scene]")?.setAttribute("aria-pressed", String(isSelected));
+		}
+	}
+
+	function readSelection(): void {
+		try {
+			const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+			const remembered = cards.some((card) => card.dataset.sceneId === saved?.id);
+			showSelection(remembered ? (saved.hidden === true ? null : saved.id) : defaultSceneId);
+		} catch {
+			showSelection(defaultSceneId);
+		}
+	}
+	readSelection();
+	window.addEventListener("storage", (event) => { if (event.key === storageKey) readSelection(); });
+
+	for (const filter of filters) {
+		filter.disabled = false;
+		filter.addEventListener("click", () => {
+			const character = filter.dataset.characterFilter || "";
+			let shown = 0;
+			for (const card of cards) {
+				const visible = !character || card.dataset.character === character;
+				card.hidden = !visible;
+				for (const link of card.querySelectorAll<HTMLElement>("[data-character-lightbox]")) {
+					if (visible) link.dataset.fancybox = "character-scenes";
+					else delete link.dataset.fancybox;
+				}
+				if (visible) shown++;
+			}
+			for (const button of filters) button.setAttribute("aria-pressed", String(button === filter));
+			if (filterStatus) filterStatus.textContent = character ? `${character}：${shown} 个场景。` : `共 ${shown} 个场景。`;
+			if (noMatch) noMatch.hidden = shown > 0;
+			document.dispatchEvent(new CustomEvent("dynamic-gallery:ready"));
+		});
+	}
+
+	for (const button of selectionButtons) {
+		button.disabled = false;
+		button.addEventListener("click", () => {
+			const id = button.dataset.setScene;
+			if (!id) return;
+			try {
+				localStorage.setItem(storageKey, JSON.stringify({ id, hidden: false }));
+				showSelection(id);
+				if (selectionState) selectionState.textContent = `已设为「${button.dataset.sceneTitle || "所选场景"}」，正在返回首页。`;
+				window.location.assign(gallery?.dataset.homeUrl || "/#home-art");
+			} catch {
+				if (selectionState) selectionState.textContent = "无法保存首页图片设置。请允许此网站保存偏好后重试；你仍可打开场景原图。";
+				selectionState?.scrollIntoView({ block: "nearest" });
+			}
+		});
+	}
+
+	for (const image of document.querySelectorAll<HTMLImageElement>(".scene-preview img")) {
+		const showFailure = () => {
+			image.hidden = true;
+			const failure = image.parentElement?.querySelector<HTMLElement>("[data-preview-failure]");
+			if (failure) failure.hidden = false;
+		};
+		image.addEventListener("error", showFailure);
+		if (image.complete && image.naturalWidth === 0) showFailure();
+	}
+</script>

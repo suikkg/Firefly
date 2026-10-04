@@ -1,0 +1,11 @@
+---
+import SitePage from "@/layouts/SitePage.astro";
+import PostList from "@/components/site/PostList.astro";
+import { getSortedPostsList } from "@/utils/content-utils";
+import { phyDictionarySeries } from "@/utils/post-series";
+const posts = await getSortedPostsList();
+const series = phyDictionarySeries.flatMap((id) =>
+	posts.filter((post) => post.id === id),
+);
+---
+<SitePage title="LTE PHY 日志字典" lede="按（一）到（六）整理的模块与消息字典。笔记设有访问密码，解锁后可按章节速查。"><PostList posts={series} /></SitePage>

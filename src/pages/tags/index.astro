@@ -1,6 +1,6 @@
 ---
 // 标签云：字号随文章数变化，点进去落到 /archive/?tag=…
-import LabPage from "@/layouts/LabPage.astro";
+import SitePage from "@/layouts/SitePage.astro";
 import { getTagList } from "@/utils/content-utils";
 import { getTagUrl } from "@/utils/url-utils";
 
@@ -16,7 +16,7 @@ function weight(count: number): number {
 }
 ---
 
-<LabPage title="标签" lede={`${tags.length} 个标签，共 ${total} 次使用。字号代表文章数量。`}>
+<SitePage title="标签" lede={`${tags.length} 个标签，共 ${total} 次使用。字号代表文章数量。`}>
 	{
 		tags.length === 0 ? (
 			<p class="empty">还没有任何标签</p>
@@ -32,7 +32,7 @@ function weight(count: number): number {
 			</div>
 		)
 	}
-</LabPage>
+</SitePage>
 
 <style>
 	.cloud {
@@ -80,7 +80,7 @@ function weight(count: number): number {
 			transform: translateY(-2px);
 		}
 		.tag:hover .hash,
-		.tag:hover .count { color: rgb(255 255 255 / 0.8); }
+		.tag:hover .count { color: var(--ink-soft); }
 	}
 
 	.empty {

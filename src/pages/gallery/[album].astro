@@ -6,12 +6,12 @@ import FancyboxManager from "@/components/features/FancyboxManager.astro";
 import { galleryConfig, siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import LabPage from "@/layouts/LabPage.astro";
+import SitePage from "@/layouts/SitePage.astro";
 import { scanAlbumPhotos } from "@/utils/gallery-utils";
 import { url } from "@/utils/url-utils";
 
 if (!siteConfig.pages.gallery) {
-	return Astro.redirect("/404/");
+	return Astro.redirect("/404.html");
 }
 
 export function getStaticPaths() {
@@ -21,7 +21,7 @@ export function getStaticPaths() {
 const { album: albumId } = Astro.params;
 const albumMeta = galleryConfig.albums.find((a) => a.id === albumId);
 if (!albumMeta) {
-	return Astro.redirect("/404/");
+	return Astro.redirect("/404.html");
 }
 
 const photos = scanAlbumPhotos(albumMeta.id);
@@ -37,7 +37,7 @@ const lede = [
 	.join(" · ");
 ---
 
-<LabPage title={albumMeta.name} description={albumMeta.description || ""} lede={lede}>
+<SitePage title={albumMeta.name} description={albumMeta.description || ""} lede={lede}>
 	<a class="back" href={url("/gallery/")}>
 		<Icon is:inline name="lucide:arrow-left" />
 		<span>{i18n(I18nKey.galleryBackToAlbums)}</span>
@@ -51,8 +51,8 @@ const lede = [
 				hint={albumMeta.passwordHint}
 			>
 				<div class="grid lab-gallery" style={`--col:${columnWidth}px`}>
-					{photos.map((p) => (
-						<img src={url(p)} alt="" loading="lazy" decoding="async" />
+					{photos.map((p, i) => (
+						<a href={url(p)} data-fancybox="album" aria-label={`查看${albumMeta.name}第 ${i + 1} 张图片`}><img src={url(p)} alt={`${albumMeta.name} · ${i + 1}`} loading="lazy" decoding="async" /></a>
 					))}
 				</div>
 			</EncryptedContent>
@@ -61,14 +61,14 @@ const lede = [
 		) : (
 			<div class="grid lab-gallery" style={`--col:${columnWidth}px`}>
 				{photos.map((p, i) => (
-					<img src={url(p)} alt="" loading={i < 6 ? "eager" : "lazy"} decoding="async" />
+					<a href={url(p)} data-fancybox="album" aria-label={`查看${albumMeta.name}第 ${i + 1} 张图片`}><img src={url(p)} alt={`${albumMeta.name} · ${i + 1}`} loading={i < 6 ? "eager" : "lazy"} decoding="async" /></a>
 				))}
 			</div>
 		)
 	}
 
 	<FancyboxManager />
-</LabPage>
+</SitePage>
 
 <style>
 	.back {
@@ -86,7 +86,7 @@ const lede = [
 		transition: background-color 0.3s var(--ease-out), color 0.3s var(--ease-out);
 	}
 
-	.back:hover { background: var(--accent); color: #fff; }
+	.back:hover { background: var(--accent-wash); color: var(--ink); }
 
 	.grid {
 		display: grid;

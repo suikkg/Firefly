@@ -54,7 +54,7 @@ import fancyboxCustomCss from "@/styles/fancybox-custom.css?url";
   }
 
   let Fancybox: any;
-  const IMG_SELECTOR = ".custom-md img:not(.card-wiki-link img), .lab-prose img, .lab-gallery img, #post-cover img, .moment-images img";
+  const IMG_SELECTOR = ".custom-md img:not(.card-wiki-link img), .site-prose img, #post-cover img, .moment-images img";
   const LINK_SELECTOR = ".moment-images a[data-fancybox], [data-fancybox]:not(.moment-images a)";
   const svgBlobUrlCache = new Map<string, string>();
 
@@ -200,6 +200,16 @@ import fancyboxCustomCss from "@/styles/fancybox-custom.css?url";
       Fancybox = mod.Fancybox;
     }
 
+    // Give unlinked content images a native keyboard and no-JS fallback link.
+    document.querySelectorAll<HTMLImageElement>(IMG_SELECTOR).forEach((img) => {
+      if (img.closest("a")) return;
+      const link = document.createElement("a");
+      link.href = img.dataset.originalSrc || img.currentSrc || img.src;
+      link.dataset.fancybox = "article-images";
+      link.setAttribute("aria-label", `放大图片${img.alt ? `：${img.alt}` : ""}`);
+      img.before(link);
+      link.append(img);
+    });
     const commonOptions = getCommonOptions();
 
     await preprocessSvgImages();
@@ -209,7 +219,7 @@ import fancyboxCustomCss from "@/styles/fancybox-custom.css?url";
     Fancybox.unbind(IMG_SELECTOR);
     Fancybox.unbind(LINK_SELECTOR);
 
-    Fancybox.bind(IMG_SELECTOR, {
+    Fancybox.bind(`${IMG_SELECTOR.split(", ").map(selector => `${selector}:not(a img)`).join(", ")}`, {
       ...commonOptions,
       groupAll: true,
       Carousel: {

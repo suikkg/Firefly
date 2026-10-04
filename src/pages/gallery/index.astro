@@ -4,12 +4,12 @@ import { Icon } from "astro-icon/components";
 import { galleryConfig, siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import LabPage from "@/layouts/LabPage.astro";
+import SitePage from "@/layouts/SitePage.astro";
 import { getAlbumCover, scanAlbumPhotos } from "@/utils/gallery-utils";
 import { url } from "@/utils/url-utils";
 
 if (!siteConfig.pages.gallery) {
-	return Astro.redirect("/404/");
+	return Astro.redirect("/404.html");
 }
 
 const albums = galleryConfig.albums.map((album) => {
@@ -26,7 +26,11 @@ const title = i18n(I18nKey.gallery);
 const description = i18n(I18nKey.galleryDescription);
 ---
 
-<LabPage title={title} description={description} lede={description}>
+<SitePage title={title} description={description} lede={description}>
+	<a class="character-entry" href={url("/gallery/characters/")}>
+		<div><h2>角色图库</h2><p>浏览角色场景图，选作首页图片。</p></div>
+		<span>浏览图库 <Icon is:inline name="lucide:arrow-up-right" /></span>
+	</a>
 	{
 		allTags.length > 0 && (
 			<div class="filter" role="group" aria-label="按标签筛选">
@@ -81,9 +85,16 @@ const description = i18n(I18nKey.galleryDescription);
 	}
 
 	<p class="empty" id="no-match" hidden>该标签下没有相册</p>
-</LabPage>
+</SitePage>
 
 <style>
+	.character-entry { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; padding: 24px; margin-bottom: 32px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--card-soft); color: var(--ink); text-decoration: none; }
+	.character-entry h2 { margin: 0; font-size: 22px; font-weight: 650; }
+	.character-entry p { margin: 8px 0 0; font-size: 14px; line-height: 1.8; color: var(--ink-soft); }
+	.character-entry > span { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--accent); font-size: 13px; }
+	.character-entry svg { width: 17px; height: 17px; }
+	.character-entry:hover { border-color: var(--accent); }
+
 	.chip[hidden], .empty[hidden], .album[hidden] { display: none; }
 
 	.filter { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
@@ -96,7 +107,7 @@ const description = i18n(I18nKey.galleryDescription);
 		transition: background-color 0.3s var(--ease-out), color 0.3s var(--ease-out), transform 0.4s var(--spring);
 	}
 	.chip:hover { transform: translateY(-2px); }
-	.chip.is-on { background: var(--accent); color: #fff; }
+	.chip.is-on { background: var(--accent-wash); color: var(--ink); }
 	.chip-n { font-family: var(--mono); font-size: 0.7em; opacity: 0.65; }
 
 	.albums {

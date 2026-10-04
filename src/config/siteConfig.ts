@@ -9,30 +9,19 @@ export const siteConfig: SiteConfig = {
 	title: "KK",
 
 	// 站点副标题
-	subtitle: "KK's Blog",
+	subtitle: "个人博客",
 
 	// 站点 URL
 	site_url: "https://www.98121516.xyz",
 
 	// 站点描述
-	description:
-		"Firefly 是一款基于 Astro 框架和 Fuwari 模板开发的清新美观且现代化个人博客主题模板，专为技术爱好者和内容创作者设计。该主题融合了现代 Web 技术栈，提供了丰富的功能模块和高度可定制的界面，让您能够轻松打造出专业且美观的个人博客网站。",
-
-	// 站点关键词
-	keywords: [
-		"Firefly",
-		"Fuwari",
-		"Astro",
-		"ACGN",
-		"博客",
-		"技术博客",
-		"静态博客",
-	],
+	description: "KK 的个人博客，分享想法与日常记录。",
+	keywords: ["KK", "个人博客", "文章", "记录"],
 
 	// 主题色
 	themeColor: {
 		// 主题色的默认色相，范围从 0 到 360。例如：红色：0，青色：200，蓝绿色：250，粉色：345
-		hue: 165,
+		hue: 225,
 		// 默认模式："light" 亮色，"dark" 暗色，"system" 跟随系统
 		defaultMode: "system",
 	},
@@ -55,15 +44,11 @@ export const siteConfig: SiteConfig = {
 	favicon: [
 		{
 			// 图标文件路径
-			src: "/favicon/firefly-32.png",
+			src: "/favicon/kk.svg",
 			// 可选，指定主题 'light' | 'dark'
 			// theme: "light",
 			// 可选，图标大小
-			sizes: "32x32",
-		},
-		{
-			src: "/favicon/firefly-192.png",
-			sizes: "192x192",
+			sizes: "any",
 		},
 	],
 
@@ -85,7 +70,7 @@ export const siteConfig: SiteConfig = {
 			alt: "Firefly",
 		},
 		// 导航栏标题
-		title: "Firefly",
+		title: "KK",
 		// 全宽导航栏，导航栏是否占满屏幕宽度
 		widthFull: false,
 		// 导航菜单对齐方式，left：左对齐，center：居中

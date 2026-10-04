@@ -1,0 +1,137 @@
+/* Shared reading typography for articles and Markdown pages. */
+.prose {
+	width: 100%;
+	max-width: 780px;
+	padding: 0;
+	font-size: 18px;
+	line-height: 1.9;
+	letter-spacing: 0.012em;
+	color: var(--ink);
+	overflow-wrap: anywhere;
+}
+
+.prose[data-reading-size="comfortable"] { font-size: 20px; }
+.prose section { max-width: none; }
+.prose p { margin: 0 0 1.5em; text-wrap: pretty; }
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 { position: relative; scroll-margin-top: 32px; text-wrap: balance; }
+.prose h2 { margin: 2.5em 0 0.85em; font-size: 1.4em; font-weight: 700; line-height: 1.45; letter-spacing: -0.02em; }
+.prose h3 { margin: 2em 0 0.75em; font-size: 1.15em; font-weight: 650; line-height: 1.5; letter-spacing: -0.014em; }
+.prose h4,
+.prose h5,
+.prose h6 { margin: 1.7em 0 0.65em; font-size: 1em; font-weight: 650; line-height: 1.6; }
+.prose > :first-child,
+.prose > section:first-child > :first-child { margin-top: 0; }
+.prose strong { font-weight: 700; }
+.prose a { color: var(--accent-deep); text-decoration-thickness: 1px; text-underline-offset: 0.22em; }
+.prose a:hover { text-decoration-thickness: 2px; }
+
+/* Heading links remain reachable with a keyboard. */
+.prose .anchor { position: absolute; left: -1.25em; top: 0; text-decoration: none; opacity: 0; }
+.prose .anchor-icon { font-size: 0.8em; color: var(--accent); }
+.prose h2:hover .anchor,
+.prose h3:hover .anchor,
+.prose h4:hover .anchor,
+.prose .anchor:focus-visible { opacity: 1; }
+
+.prose ul,
+.prose ol { margin: 0 0 1.5em; padding-left: 1.45em; }
+.prose li { margin-bottom: 0.45em; }
+.prose li > p { margin-bottom: 0.65em; }
+.prose li > ul,
+.prose li > ol { margin-block: 0.65em; }
+.prose li::marker { color: var(--accent-deep); }
+.prose blockquote { margin: 2em 0; padding: 0.25em 0 0.25em 1.2em; border-left: 3px solid var(--accent); color: var(--ink-soft); }
+.prose blockquote p:last-child { margin-bottom: 0; }
+.prose hr { margin: 3em 0; border: 0; border-top: 1px solid var(--hair); }
+
+.prose code { font-family: var(--mono); font-size: 0.87em; padding: 0.12em 0.35em; border-radius: 4px; background: var(--accent-wash); }
+.prose pre { max-width: 100%; overflow-x: auto; overflow-wrap: normal; }
+.prose .expressive-code { max-width: 100%; margin: 2em 0; overflow: hidden; border-radius: var(--radius-sm); }
+.prose .expressive-code code { padding: 0; background: none; font-size: inherit; }
+.prose .expressive-code figure { max-width: none; margin: 0; }
+.prose img { display: block; max-width: 100%; height: auto; margin: 2em 0; border-radius: var(--radius-sm); }
+.prose figure { max-width: 100%; margin: 2em 0; }
+.prose figure img { margin: 0; }
+.prose figcaption { margin-top: 0.75em; font-size: 0.75em; color: var(--ink-soft); line-height: 1.7; text-align: center; }
+
+/* Dense protocol data scrolls inside the table instead of widening the page. */
+.prose table { display: block; width: max-content; max-width: 100%; margin: 2em 0; overflow-x: auto; border-collapse: collapse; font-size: 0.88em; background: var(--card); border: 1px solid var(--hair); border-radius: var(--radius-sm); }
+.prose th,
+.prose td { padding: 0.7em 1em; border-bottom: 1px solid var(--hair); text-align: left; white-space: nowrap; }
+.prose thead th { position: sticky; top: 0; background: var(--accent-wash); color: var(--ink); font-weight: 650; }
+.prose tbody tr:last-child td { border-bottom: 0; }
+.prose tbody tr:hover td { background: color-mix(in srgb, var(--accent-wash) 50%, var(--card)); }
+.prose .math-display,
+.prose .katex-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; padding-block: 0.25em; }
+
+/* The original password component shares the site's controls and colors. */
+.prose #password-ui { display: flex; justify-content: center; padding: 24px 0; }
+.prose #password-ui[hidden],
+.prose #password-error.hidden,
+.prose #decrypted-content.hidden { display: none !important; }
+.prose #password-ui > div { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 400px; padding: 32px 24px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--card); }
+.prose #password-ui h2 { margin: 0; font-size: 20px; font-weight: 650; line-height: 1.5; }
+.prose #password-ui p { margin: 0; font-size: 14px; line-height: 1.8; text-align: center; color: var(--ink-soft); }
+.prose #password-ui svg { width: 36px; height: 36px; max-width: 36px; max-height: 36px; color: var(--accent); }
+.prose #password-form { display: flex; flex-direction: column; gap: 12px; width: 100%; margin-top: 8px; }
+.prose #password-input { min-height: 44px; width: 100%; padding: 10px 12px; border: 1px solid var(--hair); border-radius: var(--radius-sm); background: var(--ground); color: var(--ink); font-family: var(--sans); font-size: 16px; }
+.prose #password-form button { min-height: 44px; width: 100%; padding: 10px 12px; border: 1px solid var(--accent); border-radius: var(--radius-sm); background: var(--accent); color: var(--card); font-size: 14px; font-weight: 650; }
+html.dark .prose #password-form button { color: var(--ground); }
+.prose #password-form button:hover { background: var(--accent-deep); }
+.prose #password-error { color: #B42318; }
+html.dark .prose #password-error { color: #FFB4A8; }
+
+.comments { max-width: 780px; margin: 32px 0 0; padding: 0; }
+.comments-title { margin: 0 0 24px; padding-bottom: 16px; border-bottom: 1px solid var(--hair); font-size: 22px; }
+.comments #post-comments { max-width: 100%; }
+.comments #post-comments > .absolute { display: none; }
+
+/* GitHub metadata is optional and may load after the article. */
+.prose a.card-github { display: block; max-width: 100%; margin: 2em 0; padding: 20px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--card); text-decoration: none; color: var(--ink); }
+.prose a.card-github:hover { border-color: var(--accent); }
+.prose .gc-titlebar,
+.prose .gc-titlebar-left { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 1em; font-weight: 650; }
+.prose .gc-owner { display: flex; align-items: center; gap: 8px; }
+.prose .gc-user,
+.prose .gc-divider { color: var(--ink-soft); font-weight: 400; }
+.prose .gc-avatar { width: 24px; height: 24px; border-radius: 50%; background-size: cover; background-position: center; background-color: var(--hair); }
+.prose .gc-description { margin-top: 12px; font-size: 0.85em; line-height: 1.8; color: var(--ink-soft); }
+.prose .gc-infobar { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--hair); font-size: 0.75em; color: var(--ink-soft); }
+.prose a.card-github.fetch-waiting .gc-infobar,
+.prose a.card-github.fetch-waiting .gc-description { opacity: 0.5; }
+.prose .github-logo { display: none; }
+
+/* Build-time light/dark diagrams keep their original aspect ratio. */
+.prose .diagram-container { max-width: 100%; margin: 2em 0; padding: 20px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--card); }
+.prose .mermaid-wrapper { text-align: center; }
+.prose .mermaid-svg-light,
+.prose .mermaid-svg-dark { display: flex; justify-content: center; align-items: center; width: 100%; overflow: auto; }
+.prose .mermaid-svg-light svg,
+.prose .mermaid-svg-dark svg { display: block; width: auto; height: auto; max-width: 100%; max-height: min(66vh, 560px); }
+.prose .mermaid-svg-dark { display: none; }
+html.dark .prose .mermaid-svg-light { display: none; }
+html.dark .prose .mermaid-svg-dark { display: flex; }
+.prose .plantuml-image { display: block; width: 100%; max-width: 100%; max-height: 560px; object-fit: contain; margin: 0 auto; }
+
+/* Inline MDX icons should not become full-width illustrations. */
+.prose :where(svg:not(.diagram-container svg, .katex svg, .expressive-code svg, figure svg)) { max-width: 1.35em; max-height: 1.35em; }
+
+@media (max-width: 768px) {
+	.prose .mermaid-svg-light svg,
+	.prose .mermaid-svg-dark svg,
+	.prose .plantuml-image { max-height: 400px; }
+}
+
+@media (max-width: 600px) {
+	.prose { font-size: 16px; }
+	.prose[data-reading-size="comfortable"] { font-size: 18px; }
+	.prose h2 { font-size: 1.375em; }
+	.prose h3 { font-size: 1.125em; }
+	.prose .anchor { position: static; margin-right: 0.25em; opacity: 1; }
+	.prose #password-ui > div { padding: 24px 20px; }
+	.prose .diagram-container { padding: 12px; }
+}

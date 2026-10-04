@@ -6,18 +6,17 @@ import AnimeGrid from "@/components/pages/anime/AnimeGrid.svelte";
 import { siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import LabPage from "@/layouts/LabPage.astro";
-import "@/styles/lab-compat.css";
+import SitePage from "@/layouts/SitePage.astro";
+import "@/styles/site-compat.css";
 import type { StandardizedAnime } from "@/types/anime";
-import { formatDateI18nWithTime } from "@/utils/date-utils";
 
 // 检查页面是否启用
 if (!siteConfig.pages.anime) {
-	return Astro.redirect("/404/");
+	return Astro.redirect("/404.html");
 }
 
 // 获取构建时间
-const buildTime = formatDateI18nWithTime(new Date());
+
 
 // 追番配置
 const animeConfig = siteConfig.anime;
@@ -248,27 +247,11 @@ const bilibiliAverageRating =
 const isConfigured = !!(BILIBILI_UID || (TMDB_API_KEY && TMDB_LIST_ID));
 ---
 
-<LabPage title={i18n(I18nKey.anime)} description={i18n(I18nKey.animeSubtitle)}>
+<SitePage title="Bilibili 片单" lede="来自现有 Bilibili 数据源的收藏条目。">
   <div class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-32">
     <div class="card-base z-10 px-4 sm:px-6 md:px-9 py-4 sm:py-6 relative w-full">
       <!-- 页面标题 -->
       <div class="relative w-full mb-8">
-        <div class="mb-6">
-          <div class="flex items-center gap-3 mb-3">
-            <div class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70">
-              <Icon is:inline name="lucide:tv" class="text-[1.5rem]"></Icon>
-            </div>
-            <div class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">
-              {i18n(I18nKey.anime)}
-            </div>
-          </div>
-          <p class="text-base text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            {i18n(I18nKey.animeSubtitle)}
-          </p>
-          <p class="text-xs text-neutral-500 dark:text-neutral-500 mt-2">
-            {i18n(I18nKey.animeLastUpdated)} {buildTime}
-          </p>
-        </div>
 
         {!isConfigured ? (
           /* 未配置提示 */
@@ -346,4 +329,4 @@ const isConfigured = !!(BILIBILI_UID || (TMDB_API_KEY && TMDB_LIST_ID));
       </div>
     </div>
   </div>
-</LabPage>
+</SitePage>

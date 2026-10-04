@@ -2,6 +2,7 @@ import { defineCollection } from "astro:content";
 import type { CollectionConfig } from "astro/content/config";
 import { glob } from "astro/loaders";
 import { type ZodType, z } from "astro/zod";
+import { hasLocalDynamicContent } from "@/utils/dynamic-utils";
 
 type PostData = {
 	title: string;
@@ -35,7 +36,7 @@ type DynamicData = {
 
 type ContentCollection<T> = CollectionConfig<
 	ZodType<T>,
-	ReturnType<typeof glob>
+	ReturnType<typeof glob> | (() => Promise<[]>)
 >;
 
 const postsCollection: ContentCollection<PostData> = defineCollection({
@@ -74,7 +75,9 @@ const specCollection: ContentCollection<Record<string, never>> =
 	});
 
 const dynamicCollection: ContentCollection<DynamicData> = defineCollection({
-	loader: glob({ pattern: "**/*.md", base: "./src/content/dynamic" }),
+	loader: hasLocalDynamicContent()
+		? glob({ pattern: "**/*.md", base: "./src/content/dynamic" })
+		: async () => [],
 	schema: z.object({
 		published: z.date(),
 		pinned: z.boolean().optional().default(false),

@@ -1,60 +1,41 @@
 ---
 import { commentConfig } from "@/config";
-
 interface Props {
 	path: string;
 }
-
 const config = {
 	...commentConfig.waline,
 	el: "#waline",
 	path: Astro.props.path,
 	dark: "html.dark",
-	wordLimit: commentConfig.waline?.wordLimit ?? ["2", "300"],
-	...(commentConfig.waline?.visitorCount ? { pageview: true } : {}),
+	pageview: commentConfig.waline?.visitorCount ?? false,
+	wordLimit: commentConfig.waline?.wordLimit ?? [2, 300],
 };
 ---
-<!-- Waline -->
-<!-- 评论区在页面很靠下的位置，但它的第三方样式表原本是阻塞渲染的：
-     浏览器必须先跟 unpkg 建连、下载完 CSS 才肯绘制首屏。
-     这里先 preconnect 省掉握手往返，再用 media="print" 把样式表降级成非阻塞加载，
-     onload 后切回 all 生效；禁用 JS 时由 noscript 里的普通 link 兜底。 -->
-<link rel="preconnect" href="https://unpkg.com" crossorigin />
-<link rel="dns-prefetch" href="https://unpkg.com" />
-
-<div class="relative w-full">
-  <div id="waline"></div>
-  <link
-    id="waline-style"
-    rel="stylesheet"
-    href="https://unpkg.com/@waline/client@v3/dist/waline.css"
-    media="print"
-  />
-  <noscript>
-    <link rel="stylesheet" href="https://unpkg.com/@waline/client@v3/dist/waline.css" />
-  </noscript>
-  <script is:inline>
-    (function () {
-      var link = document.getElementById("waline-style");
-      if (!link) return;
-      var apply = function () {
-        link.media = "all";
-      };
-      // 命中缓存时 load 可能已经过去了，用 sheet 是否可读来兜一手
-      if (link.sheet) apply();
-      else link.addEventListener("load", apply, { once: true });
-    })();
-  </script>
-  <script type="module" is:inline define:vars={{ config }}>
-    import { init } from 'https://unpkg.com/@waline/client@v3/dist/waline.js';
-    const requestedPath = new URLSearchParams(window.location.search).get("path");
-    const effectiveConfig = requestedPath
-      ? { ...config, path: requestedPath }
-      : config;
-    try {
-      init(effectiveConfig);
-    } catch (error) {
-      console.error("[Waline] Failed to initialize:", error);
-    }
-  </script>
-</div>
+<div id="waline-section"><div id="waline"></div><p id="comment-state" role="status">评论将在滚动到此处时加载。</p><button id="comment-retry" type="button" hidden>重新加载评论</button><noscript><p>评论需要启用 JavaScript；也可以通过页脚邮件联系。</p></noscript></div>
+<script type="module" is:inline define:vars={{ config }}>
+ const host = document.getElementById("waline-section");
+ const state = document.getElementById("comment-state");
+ const retry = document.getElementById("comment-retry");
+ let loading = false;
+ let loaded = false;
+ let attempts = 0;
+ async function load() {
+  if (loaded || loading) return;
+  loading = true; retry.hidden = true; state.hidden = false; state.textContent = "正在加载评论…";
+  try {
+   if (!document.getElementById("waline-style")) {
+    const style = document.createElement("link"); style.id = "waline-style"; style.rel = "stylesheet"; style.href = "https://unpkg.com/@waline/client@v3/dist/waline.css"; document.head.append(style);
+   }
+   const url = "https://unpkg.com/@waline/client@v3/dist/waline.js";
+   const { init } = await import(attempts++ ? `${url}?retry=${attempts}` : url);
+   const requestedPath = location.pathname.startsWith("/dynamic/comments") ? new URLSearchParams(location.search).get("path") : null;
+   init({ ...config, path: requestedPath?.startsWith("/dynamic/") ? requestedPath : config.path });
+   loaded = true; state.hidden = true;
+  } catch { state.textContent = "评论暂时无法加载，请重试或通过邮件联系。"; retry.hidden = false; }
+  finally { loading = false; }
+ }
+ retry.addEventListener("click", load);
+ if ("IntersectionObserver" in window) { const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); load(); } }, { rootMargin: "200px" }); observer.observe(host); } else { load(); }
+</script>
+<style is:global>#waline { --waline-theme-color: var(--accent-deep); --waline-bg-color: var(--card); --waline-color: var(--ink); --waline-info-color: var(--ink-soft); } #comment-state { color: var(--ink-soft); font-size: 14px; } #comment-retry { padding: 10px 16px; color: var(--ink); background: var(--card); border: 1px solid var(--hair); border-radius: 8px; }</style>

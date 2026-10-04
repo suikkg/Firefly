@@ -44,8 +44,8 @@ const labels = {
 
       <form id="password-form" class="w-full mt-2 space-y-2">
         <input
+          aria-label={labels.placeholder}
           id="password-input"
-          name="password"
           type="password"
           placeholder={labels.placeholder}
           autocomplete="off"
@@ -56,14 +56,16 @@ const labels = {
         />
         <button
           type="submit"
+          disabled
           class="w-full py-2 rounded-lg text-sm font-medium bg-(--primary) text-white dark:text-black/70
                  hover:opacity-85 active:scale-[0.98] transition-all"
         >
           {labels.submit}
         </button>
       </form>
+      <noscript><p>解锁文章需要启用 JavaScript。</p></noscript>
 
-      <p id="password-error" class="text-xs text-red-500 dark:text-red-400 m-0 hidden">{labels.error}</p>
+      <p id="password-error" role="alert" class="text-xs text-red-500 dark:text-red-400 m-0 hidden">{labels.error}</p>
     </div>
   </div>
 
@@ -79,6 +81,8 @@ const labels = {
      只渲染视口附近的块；contain-intrinsic-size 用 auto，浏览器会记住每块首次渲染后的
      真实高度，所以目录锚点跳转和阅读进度条不会长期失准。
      只作用于解密注入的正文，普通文章的渲染路径不受影响。 */
+  #password-ui[hidden] { display: none !important; }
+
   #decrypted-content > * {
     content-visibility: auto;
     contain-intrinsic-size: auto 1200px;
@@ -146,6 +150,9 @@ const labels = {
       old.parentNode.replaceChild(ns, old);
     }
 
+    // 持久 DOM 标记让晚加载的阅读工具和目录也能识别完整解锁。
+    contentEl.dataset.decryptionComplete = 'true';
+
     // 整篇已经渲染完，解除断路器
     ssDel(pendingKey);
 
@@ -180,6 +187,7 @@ const labels = {
 
   function showContent(html) {
     ssSet(pendingKey, '1');
+    delete contentEl.dataset.decryptionComplete;
 
     // 先在游离的 template 里解析：这一步不触发样式计算和布局。
     // 再按帧把顶层节点搬进文档，避免一次性提交上万个节点的布局。
@@ -192,6 +200,7 @@ const labels = {
     }
 
     contentEl.classList.remove('hidden');
+    ui.hidden = true;
     ui.classList.add('hidden');
 
     var i = 0;
@@ -284,19 +293,29 @@ const labels = {
     return new TextDecoder().decode(decrypted);
   }
 
+  var busy = false;
   // Handle form submit
   form.addEventListener('submit', function(e) {
     e.preventDefault();
     var pwd = input.value.trim();
-    if (!pwd) return;
+    if (!pwd || busy) return;
+    busy = true;
+    var submit = form.querySelector("button");
+    submit.disabled = true;
     hideError();
     decrypt(pwd).then(function(html) {
       ssSet(cacheKey, pwd);
       showContent(html);
     }).catch(function() {
       showError();
+    }).finally(function() {
+      busy = false;
+      submit.disabled = false;
     });
   });
+
+  // Enable only after the local submit handler is installed.
+  form.querySelector("button").disabled = false;
 
   // Try cached password
   var cached = ssGet(cacheKey);

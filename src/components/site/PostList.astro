@@ -1,0 +1,39 @@
+---
+import { Icon } from "astro-icon/components";
+import type { PostForList } from "@/utils/content-utils";
+import { getCategoryUrl } from "@/utils/url-utils";
+
+interface Props {
+	posts: PostForList[];
+}
+const { posts } = Astro.props;
+
+function dateParts(date: Date) {
+	const iso = date.toISOString().slice(0, 10);
+	return { iso, year: iso.slice(0, 4), day: iso.slice(5).replace("-", ".") };
+}
+---
+<ul class="note-list">
+	{posts.map(post => {
+		const date = dateParts(post.data.published);
+		const category = post.data.category || "未分类";
+		return <li class="note-row" data-note-category={category}>
+			<time class="note-date" datetime={date.iso} aria-label={date.iso}>
+				<span class="note-date-year">{date.year}</span>
+				<span class="note-date-day">{date.day}</span>
+			</time>
+			<div class="note-body">
+				<div class="note-meta">
+					<a class="note-category" href={getCategoryUrl(category)}>{category}</a>
+					<span class="note-state">
+						<Icon name={post.data.password ? "lucide:lock-keyhole" : "lucide:book-open"} aria-hidden="true" />
+						{post.data.password ? "受保护" : "公开笔记"}
+					</span>
+				</div>
+				<h2><a href={`/posts/${post.id}/`}>{post.data.title}</a></h2>
+				{post.data.description && <p>{post.data.description}</p>}
+				{post.data.tags.length > 0 && <div class="note-meta note-tags">{post.data.tags.slice(0, 4).map(tag => <a href={`/archive/?tag=${encodeURIComponent(tag)}`}>{tag}</a>)}</div>}
+			</div>
+		</li>;
+	})}
+</ul>

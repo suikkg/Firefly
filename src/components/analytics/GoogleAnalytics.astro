@@ -1,19 +1,13 @@
 ---
-interface Props {
-	analyticsId: string;
-}
-
+interface Props { analyticsId: string; }
 const { analyticsId } = Astro.props;
 ---
-
-<!-- Google tag (gtag.js) -->
-<script is:inline data-swup-ignore-script async src={`https://www.googletagmanager.com/gtag/js?id=${analyticsId}`}></script>
-<script is:inline data-swup-ignore-script define:vars={{analyticsId}}>window.dataLayer = window.dataLayer || [];
-
-function gtag() {
-    dataLayer.push(arguments);
-}
-
-gtag('js', new Date());
-gtag('config', analyticsId);
+<script is:inline define:vars={{ analyticsId }}>
+(function () {
+ if (["localhost", "127.0.0.1"].includes(location.hostname)) return;
+ window.dataLayer = window.dataLayer || [];
+ function gtag() { window.dataLayer.push(arguments); }
+ gtag("js", new Date()); gtag("config", analyticsId);
+ const script = document.createElement("script"); script.async = true; script.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(analyticsId); document.head.append(script);
+})();
 </script>

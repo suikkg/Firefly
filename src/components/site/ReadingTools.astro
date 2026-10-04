@@ -1,0 +1,177 @@
+---
+import type { ReadingPost } from "@/utils/reading-memory";
+
+interface Props {
+	post: ReadingPost;
+	protected?: boolean;
+}
+
+const { post, protected: isProtected = false } = Astro.props;
+---
+
+<div class="reading-tools" data-reading-tools data-post-id={post.id} data-post-title={post.title} data-protected={String(isProtected)} hidden data-pagefind-ignore>
+	<div class="reading-controls">
+		<div class="reading-size" role="group" aria-label="正文字号">
+			<span>字号</span>
+			<button type="button" data-reading-size="standard" aria-pressed="true" aria-controls="article">标准</button>
+			<button type="button" data-reading-size="comfortable" aria-pressed="false" aria-controls="article">舒适</button>
+		</div>
+		<button class="reading-copy" type="button" data-copy-link>复制链接</button>
+		<button class="reading-restore" type="button" data-restore-reading hidden>回到上次位置</button>
+	</div>
+	<p class="reading-feedback" role="status" aria-live="polite" data-reading-feedback></p>
+	<div class="reading-copy-fallback" data-copy-fallback hidden>
+		<label>文章链接<input type="url" readonly aria-label="手动复制文章链接" data-copy-input /></label>
+	</div>
+</div>
+
+<style>
+	.reading-tools { border-top: 1px solid var(--hair); padding-top: 16px; margin-top: 24px; }
+	.reading-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+	.reading-size { display: flex; align-items: center; gap: 4px; }
+	.reading-size > span { font-size: 13px; color: var(--ink-soft); margin-right: 8px; }
+	.reading-tools button { min-height: 44px; border: 1px solid transparent; border-radius: var(--radius-sm); padding: 0 12px; background: transparent; color: var(--ink-soft); font-size: 13px; }
+	.reading-tools button:hover { color: var(--accent-deep); background: var(--accent-wash); }
+	.reading-size button[aria-pressed="true"] { color: var(--accent-deep); border-color: var(--hair); background: var(--card); }
+	.reading-tools .reading-restore { color: var(--accent-deep); background: var(--accent-wash); }
+	.reading-tools button:disabled { cursor: default; color: var(--ink-soft); background: transparent; }
+	.reading-feedback { font-size: 12px; line-height: 1.7; color: var(--ink-soft); margin: 8px 0 0; }
+	.reading-feedback:empty { display: none; }
+	.reading-copy-fallback { margin-top: 12px; }
+	.reading-copy-fallback label { display: grid; gap: 8px; font-size: 13px; color: var(--ink-soft); }
+	.reading-copy-fallback input { min-height: 44px; width: 100%; padding: 8px 12px; border: 1px solid var(--hair); border-radius: var(--radius-sm); background: var(--card); color: var(--ink); font-size: 16px; }
+	@media (max-width: 600px) { .reading-controls { gap: 8px; } .reading-size > span { margin-right: 4px; } .reading-tools button { padding-inline: 10px; } }
+</style>
+
+<script>
+	import { readReadingMemory, readReadingSize, readingPostPath, saveReadingMemory, saveReadingSize, type ReadingSize } from "@/utils/reading-memory";
+
+	const tools = document.querySelector<HTMLElement>("[data-reading-tools]");
+	const article = document.getElementById("article");
+	if (tools && article) {
+		const post = { id: tools.dataset.postId ?? "", title: tools.dataset.postTitle ?? "" };
+		const path = readingPostPath(post.id);
+		const isProtected = tools.dataset.protected === "true";
+		let canRemember = !isProtected || article.querySelector<HTMLElement>("#decrypted-content")?.dataset.decryptionComplete === "true";
+		let userScrolled = false;
+		let userIntent = false;
+		let saveTimer: ReturnType<typeof setTimeout> | undefined;
+		const saved = readReadingMemory([post]);
+		const feedback = tools.querySelector<HTMLElement>("[data-reading-feedback]");
+		const restore = tools.querySelector<HTMLButtonElement>("[data-restore-reading]");
+		const sizeButtons = tools.querySelectorAll<HTMLButtonElement>("[data-reading-size]");
+		tools.hidden = false;
+
+		function announce(message: string): void {
+			if (feedback) feedback.textContent = message;
+		}
+
+		function setSize(size: ReadingSize): void {
+			if (!article) return;
+			article.dataset.readingSize = size;
+			for (const button of sizeButtons) button.setAttribute("aria-pressed", String(button.dataset.readingSize === size));
+		}
+		setSize(readReadingSize());
+		for (const button of sizeButtons) {
+			button.addEventListener("click", () => {
+				const size: ReadingSize = button.dataset.readingSize === "comfortable" ? "comfortable" : "standard";
+				setSize(size);
+				const remembered = saveReadingSize(size);
+				announce(`已切换为${size === "comfortable" ? "舒适" : "标准"}字号${remembered ? "。" : "，仅在当前页生效。"}`);
+			});
+		}
+
+		tools.querySelector<HTMLButtonElement>("[data-copy-link]")?.addEventListener("click", async () => {
+			if (!path) return;
+			const link = new URL(path, window.location.origin).href;
+			const fallback = tools.querySelector<HTMLElement>("[data-copy-fallback]");
+			try {
+				if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+				await navigator.clipboard.writeText(link);
+				if (fallback) fallback.hidden = true;
+				announce("链接已复制。");
+			} catch {
+				const input = tools.querySelector<HTMLInputElement>("[data-copy-input]");
+				if (fallback) fallback.hidden = false;
+				if (input) { input.value = link; input.focus(); input.select(); }
+				announce("复制未完成，已选中文章链接，可手动复制。");
+			}
+		});
+
+		function updateRestore(): void {
+			if (!restore || !saved) return;
+			restore.hidden = saved.progress < 0.01;
+			restore.disabled = !canRemember;
+			restore.textContent = canRemember
+				? `回到上次位置（${Math.round(saved.progress * 100)}%）`
+				: "解锁后恢复阅读";
+		}
+		updateRestore();
+
+		restore?.addEventListener("click", () => {
+			if (!saved || !canRemember || !article) return;
+			const rect = article.getBoundingClientRect();
+			const top = rect.top + window.scrollY;
+			const span = Math.max(0, rect.height - window.innerHeight);
+			// Fractional progress preserves the position within a section instead of
+			// jumping to its heading. Lazy-rendered long articles remain approximate.
+			const target = top + span * saved.progress;
+			userIntent = true;
+			window.scrollTo({ top: Math.max(0, target), behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+			article.focus({ preventScroll: true });
+			announce(isProtected ? "已回到上次阅读位置附近。" : "已回到上次阅读位置。");
+		});
+
+		function persistPosition(): void {
+			if (!canRemember || !userScrolled || !article || !path) return;
+			const rect = article.getBoundingClientRect();
+			const top = rect.top + window.scrollY;
+			const span = rect.height - window.innerHeight;
+			const progress = span > 0 ? (window.scrollY - top) / span : window.scrollY >= top ? 1 : 0;
+			// Scrolling the introduction must not erase a previous reading position.
+			if (progress <= 0) return;
+			// Protected heading IDs can contain title text; preserve only numeric progress.
+			let anchor: string | null = null;
+			if (!isProtected) {
+				for (const heading of article.querySelectorAll<HTMLElement>("h2[id], h3[id]")) {
+					if (heading.getBoundingClientRect().top > 100) break;
+					anchor = heading.id;
+				}
+			}
+			saveReadingMemory(post, progress, anchor);
+		}
+
+		// Initial load, layout shifts and browser restoration must not replace a bookmark.
+		window.addEventListener("wheel", (event) => { if (event.isTrusted && canRemember) userIntent = true; }, { passive: true });
+		window.addEventListener("touchmove", (event) => { if (event.isTrusted && canRemember) userIntent = true; }, { passive: true });
+		document.addEventListener("keydown", (event) => {
+			if (!event.isTrusted || !canRemember || !(event.target instanceof Element)) return;
+			if (event.target.closest("input, textarea, select, [contenteditable]")) return;
+			if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)) userIntent = true;
+		});
+		document.addEventListener("pointerdown", (event) => {
+			if (!event.isTrusted || !canRemember || !(event.target instanceof Element)) return;
+			const scrollBar = event.target === document.documentElement && event.clientX >= document.documentElement.clientWidth;
+			if (scrollBar || event.target.closest("[data-toc-link], .prose .anchor")) userIntent = true;
+		});
+		document.addEventListener("click", (event) => {
+			if (!event.isTrusted || !canRemember || !(event.target instanceof Element)) return;
+			if (event.target.closest("[data-toc-link], .prose .anchor")) userIntent = true;
+		});
+		window.addEventListener("scroll", () => {
+			if (!canRemember || !userIntent) return;
+			userScrolled = true;
+			if (saveTimer) clearTimeout(saveTimer);
+			saveTimer = setTimeout(persistPosition, 600);
+		}, { passive: true });
+		window.addEventListener("pagehide", persistPosition);
+		document.addEventListener("visibilitychange", () => { if (document.hidden) persistPosition(); });
+		document.addEventListener("password:decrypted", () => {
+			if (!isProtected || article.querySelector<HTMLElement>("#decrypted-content")?.dataset.decryptionComplete !== "true") return;
+			canRemember = true;
+			userIntent = false;
+			userScrolled = false;
+			updateRestore();
+		});
+	}
+</script>

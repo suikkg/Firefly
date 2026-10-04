@@ -1,0 +1,61 @@
+---
+import { Icon } from "astro-icon/components";
+import { profileConfig } from "@/config/profileConfig";
+import { siteNavigation } from "@/config/navigation";
+
+const path = Astro.url.pathname;
+---
+<a class="skip-link" href="#main-content">跳到内容</a>
+<header class="site-header">
+	<a href="/" class="site-brand" aria-label="KK 个人博客首页">
+		<img class="brand-avatar" src={profileConfig.avatar} width="36" height="36" alt="" decoding="async" />
+		<span class="brand-name">KK</span>
+		<span class="brand-label">个人博客</span>
+	</a>
+	<nav class="site-nav" aria-label="主导航">
+		{siteNavigation.map(link => <a href={link.href} aria-current={link.match.some(prefix => path.startsWith(prefix)) ? "page" : undefined}>{link.name}</a>)}
+	</nav>
+	<div class="site-actions">
+		<a href="/search/" class="search-action" aria-keyshortcuts="Control+K Meta+K">
+			<Icon name="lucide:search" aria-hidden="true" />
+			<span>搜索</span>
+			<kbd id="search-shortcut" aria-hidden="true">Ctrl K</kbd>
+		</a>
+		<label class="theme-control">
+			<span class="sr-only">主题模式</span>
+			<svg class="theme-glyph" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3v14M3 10h14M5 5l10 10M5 15L15 5" /><circle cx="10" cy="10" r="4" /></svg>
+			<select id="theme-mode" aria-label="主题模式">
+				<option value="system">跟随系统</option>
+				<option value="light">浅色</option>
+				<option value="dark">深色</option>
+			</select>
+		</label>
+	</div>
+</header>
+<script>
+	const control = document.getElementById("theme-mode") as HTMLSelectElement | null;
+	if (control) {
+		const syncThemeControl = () => {
+			control.value = document.documentElement.dataset.mode || "system";
+		};
+		syncThemeControl();
+		window.addEventListener("site:themechange", syncThemeControl);
+		control.addEventListener("change", () => {
+			window.dispatchEvent(new CustomEvent("site:theme", { detail: control.value }));
+		});
+	}
+
+	const shortcut = document.getElementById("search-shortcut");
+	if (shortcut && /Mac|iPhone|iPad|iPod/.test(navigator.platform)) {
+		shortcut.textContent = "⌘ K";
+	}
+	document.addEventListener("keydown", (event) => {
+		if (event.defaultPrevented || event.repeat || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== "k") return;
+		const target = event.target;
+		if (target instanceof HTMLElement && (target.isContentEditable || target.closest("input, textarea, select, [role='textbox']"))) return;
+		event.preventDefault();
+		window.location.assign("/search/");
+	});
+</script>
+
+<style>.brand-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; } @media(max-width:520px) { .brand-avatar { width: 30px; height: 30px; } }</style>

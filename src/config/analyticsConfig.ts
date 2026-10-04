@@ -8,7 +8,7 @@ export const analyticsConfig: AnalyticsConfig = {
 	// Microsoft Clarity ID
 	// 获取：https://clarity.microsoft.com 创建项目后获得，格式如 tx9equrgr6
 	// 若不需要可留空禁用
-	microsoftClarityId: "xvwfugsoho",
+	microsoftClarityId: "",
 	// Umami 统计配置
 	umamiAnalytics: {
 		// Umami Website ID
